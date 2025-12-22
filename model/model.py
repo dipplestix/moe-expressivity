@@ -26,10 +26,10 @@ class OneLayerTransformer(nn.Module):
         self.ffn_norm = nn.RMSNorm(model_dim)
         if ffn_type == "ffn":   
             intermediate_dim = model_dim * 4
-            self.ffn = FFN(input_dim=model_dim, intermediate_dim=intermediate_dim, output_dim=model_dim, activation=nn.SiLU())
+            self.ffn = FFN(input_dim=model_dim, intermediate_dim=intermediate_dim, output_dim=model_dim, activation=nn.SiLU)
         elif ffn_type == "glu":
             intermediate_dim = model_dim * 2
-            self.ffn = GLU(input_dim=model_dim, intermediate_dim=intermediate_dim, output_dim=model_dim, activation=nn.SiLU())
+            self.ffn = GLU(input_dim=model_dim, intermediate_dim=intermediate_dim, output_dim=model_dim, activation=nn.SiLU)
         else:
             raise ValueError(f"Invalid FFN type: {ffn_type}")
 
@@ -39,14 +39,11 @@ class OneLayerTransformer(nn.Module):
     def forward(self, x):
         x = self.vocab(x)
         
-        x = self.atn_norm(x)
-        x = x + self.atn(x)
+        x = x + self.atn(self.atn_norm(x))
 
-        x = self.ffn_norm(x)
-        x = x + self.ffn(x)
+        x = x + self.ffn(self.ffn_norm(x))
         
         x = self.out_norm(x)
         
         logits = F.linear(x, self.vocab.weight)
         return logits
-        
