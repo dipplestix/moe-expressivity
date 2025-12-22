@@ -3,6 +3,26 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Optional
 
+
+class FFN(nn.Module):
+    def __init__(self, input_dim, intermediate_dim, output_dim, activation=nn.SiLU):
+        super().__init__()
+    
+        self.input_dim = input_dim
+        self.intermediate_dim = intermediate_dim
+        self.output_dim = output_dim
+        self.activation = activation()
+
+        self.up_proj = nn.Linear(input_dim, intermediate_dim)
+        self.down_proj = nn.Linear(intermediate_dim, output_dim) 
+
+    def forward(self, x):
+        proj = self.up_proj(x)
+        out = self.down_proj(proj)
+    
+        return out
+
+
 class GLU(nn.Module):
     def __init__(self, input_dim, intermediate_dim, output_dim, activation=nn.SiLU):
         super().__init__()
