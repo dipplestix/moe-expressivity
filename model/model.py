@@ -49,4 +49,3 @@ class OneLayerTransformer(nn.Module):
         
         logits = F.linear(x, self.vocab.weight)
         return logits
-        
