@@ -17,7 +17,7 @@ class FFN(nn.Module):
         self.down_proj = nn.Linear(intermediate_dim, output_dim) 
 
     def forward(self, x):
-        proj = self.up_proj(x)
+        proj = self.activation(self.up_proj(x))
         out = self.down_proj(proj)
     
         return out
@@ -102,6 +102,5 @@ class MHA(nn.Module):
         # Merge heads
         y = y.transpose(1, 2).contiguous().view(B, L, C)
         y = self.o_proj(y)
-        y = self.proj_drop(y)
 
         return y
