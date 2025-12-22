@@ -55,6 +55,7 @@ class MHA(nn.Module):
         num_heads: int,
         dropout: float = 0.0,
         qkv_bias: bool = False,
+        is_causal: bool = True,
     ):
         super().__init__()
 
@@ -63,6 +64,7 @@ class MHA(nn.Module):
         self.num_heads = num_heads
         self.d_head = d_model // num_heads
         self.dropout = dropout
+        self.is_causal = is_causal
 
         self.q_proj = nn.Linear(d_model, d_model, bias=qkv_bias)
         self.k_proj = nn.Linear(d_model, d_model, bias=qkv_bias)
@@ -95,7 +97,7 @@ class MHA(nn.Module):
         y = F.scaled_dot_product_attention(
                 q, k, v,
                 dropout_p=self.dropout if self.training else 0.0,
-                is_causal=False
+                is_causal=self.is_causal
         )  # (B, H, L, D)
 
         
