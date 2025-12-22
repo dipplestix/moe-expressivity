@@ -5,12 +5,13 @@ from components import MHA, FFN, GLU
 
 
 class OneLayerTransformer(nn.Module):
-    def __init__(self, 
-    model_dim, 
-    num_heads, 
-    ffn_type="ffn", 
-    dropout=0.0, 
+    def __init__(self,
+    model_dim,
+    num_heads,
+    ffn_type="ffn",
+    dropout=0.0,
     vocab_size=10,
+    max_seq_len=128,
     ):
         super().__init__()
         self.model_dim = model_dim
@@ -19,6 +20,7 @@ class OneLayerTransformer(nn.Module):
         self.dropout = dropout
 
         self.vocab = nn.Embedding(vocab_size, model_dim)
+        self.pos_embed = nn.Embedding(max_seq_len, model_dim)
 
         self.atn_norm = nn.RMSNorm(model_dim)
         self.atn = MHA(d_model=model_dim, num_heads=num_heads, dropout=dropout)
@@ -37,8 +39,10 @@ class OneLayerTransformer(nn.Module):
 
 
     def forward(self, x):
-        x = self.vocab(x)
-        
+        B, T = x.shape
+        pos = torch.arange(T, device=x.device)
+        x = self.vocab(x) + self.pos_embed(pos)
+
         x = x + self.atn(self.atn_norm(x))
 
         x = x + self.ffn(self.ffn_norm(x))

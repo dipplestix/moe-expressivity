@@ -1,0 +1,15 @@
+# Dependencies
+uv.lock
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Training artifacts
+checkpoints/
+wandb/
+
+# IDE
+.idea/
+.vscode/
