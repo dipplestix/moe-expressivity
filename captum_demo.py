@@ -12,15 +12,13 @@ def _():
 
 @app.cell
 def _(mo):
-    mo.md(
-        """
-        # Captum Interpretability Demo
+    mo.md("""
+    # Captum Interpretability Demo
 
-        This notebook demonstrates how to use Captum for model interpretability.
-        We'll train a simple neural network on a classification task and then
-        analyze which input features are most important for predictions.
-        """
-    )
+    This notebook demonstrates how to use Captum for model interpretability.
+    We'll train a simple neural network on a classification task and then
+    analyze which input features are most important for predictions.
+    """)
     return
 
 
@@ -37,7 +35,9 @@ def _():
 
 @app.cell
 def _(mo):
-    mo.md("## 1. Generate Synthetic Data")
+    mo.md("""
+    ## 1. Generate Synthetic Data
+    """)
     return
 
 
@@ -70,25 +70,14 @@ def _(np, torch):
 
     print(f"Training samples: {len(X_train)}, Test samples: {len(X_test)}")
     print(f"Class distribution (train): {y_train.sum().item()} positive, {len(y_train) - y_train.sum().item()} negative")
-    return (
-        X,
-        X_tensor,
-        X_test,
-        X_train,
-        decision,
-        n_features,
-        n_samples,
-        train_size,
-        y,
-        y_tensor,
-        y_test,
-        y_train,
-    )
+    return X_test, X_train, n_features, y_test, y_train
 
 
 @app.cell
 def _(mo):
-    mo.md("## 2. Define and Train a Simple Model")
+    mo.md("""
+    ## 2. Define and Train a Simple Model
+    """)
     return
 
 
@@ -107,7 +96,6 @@ def _(nn):
 
         def forward(self, x):
             return self.net(x)
-
     return (SimpleClassifier,)
 
 
@@ -120,7 +108,6 @@ def _(
     n_features,
     nn,
     optim,
-    torch,
     y_train,
 ):
     # Create model
@@ -154,22 +141,7 @@ def _(
             print(f"Epoch {epoch + 1}/{n_epochs}, Loss: {avg_loss:.4f}")
 
     print("Training complete!")
-    return (
-        avg_loss,
-        batch_x,
-        batch_y,
-        criterion,
-        epoch,
-        epoch_loss,
-        loss,
-        losses,
-        model,
-        n_epochs,
-        optimizer,
-        outputs,
-        train_dataset,
-        train_loader,
-    )
+    return losses, model
 
 
 @app.cell
@@ -181,7 +153,7 @@ def _(X_test, model, torch, y_test):
         predictions = test_outputs.argmax(dim=1)
         accuracy = (predictions == y_test).float().mean().item()
         print(f"Test Accuracy: {accuracy:.2%}")
-    return accuracy, predictions, test_outputs
+    return
 
 
 @app.cell
@@ -199,17 +171,15 @@ def _(losses, plt):
 
 @app.cell
 def _(mo):
-    mo.md(
-        """
-        ## 3. Captum Interpretability Analysis
+    mo.md("""
+    ## 3. Captum Interpretability Analysis
 
-        Now let's use Captum to understand which features the model considers important.
-        We'll use several attribution methods:
-        - **Integrated Gradients**: Attributes importance by integrating gradients along a path
-        - **Saliency**: Simple gradient-based attribution
-        - **Feature Ablation**: Measures importance by removing features
-        """
-    )
+    Now let's use Captum to understand which features the model considers important.
+    We'll use several attribution methods:
+    - **Integrated Gradients**: Attributes importance by integrating gradients along a path
+    - **Saliency**: Simple gradient-based attribution
+    - **Feature Ablation**: Measures importance by removing features
+    """)
     return
 
 
@@ -220,7 +190,7 @@ def _():
 
 
 @app.cell
-def _(FeatureAblation, IntegratedGradients, Saliency, X_test, model, torch):
+def _(FeatureAblation, IntegratedGradients, Saliency, X_test, model):
     # Set model to eval mode
     model.eval()
 
@@ -251,25 +221,14 @@ def _(FeatureAblation, IntegratedGradients, Saliency, X_test, model, torch):
 
     print("Attribution analysis complete!")
     print(f"Analyzed {n_samples_to_analyze} samples")
-    return (
-        avg_fa,
-        avg_ig,
-        avg_saliency,
-        fa,
-        fa_attributions,
-        ig,
-        ig_attributions,
-        model_forward,
-        n_samples_to_analyze,
-        saliency,
-        saliency_attributions,
-        sample_inputs,
-    )
+    return avg_fa, avg_ig, avg_saliency, ig
 
 
 @app.cell
 def _(mo):
-    mo.md("## 4. Visualize Feature Importance")
+    mo.md("""
+    ## 4. Visualize Feature Importance
+    """)
     return
 
 
@@ -307,23 +266,21 @@ def _(avg_fa, avg_ig, avg_saliency, n_features, np, plt):
 
     plt.tight_layout()
     plt.gca()
-    return axes, feature_names, fig, x_pos
+    return
 
 
 @app.cell
 def _(mo):
-    mo.md(
-        """
-        ## 5. Compare with Ground Truth
+    mo.md("""
+    ## 5. Compare with Ground Truth
 
-        Remember, our synthetic data was generated with the rule:
-        **Class 1 if: 2*x₀ + 1.5*x₁ - x₂ > 0**
+    Remember, our synthetic data was generated with the rule:
+    **Class 1 if: 2*x₀ + 1.5*x₁ - x₂ > 0**
 
-        So we expect Features 0, 1, and 2 to have the highest importance,
-        with Feature 0 being most important (coefficient 2), followed by
-        Feature 1 (coefficient 1.5), then Feature 2 (coefficient -1).
-        """
-    )
+    So we expect Features 0, 1, and 2 to have the highest importance,
+    with Feature 0 being most important (coefficient 2), followed by
+    Feature 1 (coefficient 1.5), then Feature 2 (coefficient -1).
+    """)
     return
 
 
@@ -355,24 +312,22 @@ def _(avg_fa, avg_ig, avg_saliency, np, plt):
 
     plt.tight_layout()
     plt.gca()
-    return ax, fig2, ground_truth, normalize, width, x
-
-
-@app.cell
-def _(mo):
-    mo.md(
-        """
-        ## 6. Single Sample Analysis
-
-        Let's look at attributions for a single sample to see how the model
-        reasons about individual predictions.
-        """
-    )
     return
 
 
 @app.cell
-def _(X_test, ig, model, np, plt, torch):
+def _(mo):
+    mo.md("""
+    ## 6. Single Sample Analysis
+
+    Let's look at attributions for a single sample to see how the model
+    reasons about individual predictions.
+    """)
+    return
+
+
+@app.cell
+def _(X_test, ig, model, plt, torch):
     # Analyze a single sample
     single_sample = X_test[0:1]
 
@@ -404,35 +359,33 @@ def _(X_test, ig, model, np, plt, torch):
 
     plt.tight_layout()
     plt.gca()
-    return (
-        attrs,
-        ax3,
-        colors,
-        fig3,
-        pred,
-        pred_class,
-        pred_probs,
-        single_ig,
-        single_sample,
-    )
+    return
 
 
 @app.cell
 def _(mo):
-    mo.md(
-        """
-        ## Summary
+    mo.md("""
+    ## Summary
 
-        This demo showed how to use Captum's attribution methods:
+    This demo showed how to use Captum's attribution methods:
 
-        1. **Integrated Gradients** - Accumulates gradients along a path from baseline to input
-        2. **Saliency** - Computes gradients of output w.r.t. input
-        3. **Feature Ablation** - Measures change in output when features are removed
+    1. **Integrated Gradients** - Accumulates gradients along a path from baseline to input
+    2. **Saliency** - Computes gradients of output w.r.t. input
+    3. **Feature Ablation** - Measures change in output when features are removed
 
-        All three methods correctly identified Features 0, 1, and 2 as the most important,
-        which matches our ground truth data generation process.
-        """
-    )
+    All three methods correctly identified Features 0, 1, and 2 as the most important,
+    which matches our ground truth data generation process.
+    """)
+    return
+
+
+@app.cell
+def _():
+    return
+
+
+@app.cell
+def _():
     return
 
 
