@@ -170,11 +170,9 @@ class HookedMHA(nn.Module):
         k = self.hook_k(k)
         v = self.hook_v(v)
 
-        # Manual attention computation to expose attention pattern
         scale = 1.0 / (self.d_head ** 0.5)
         attn_weights = torch.matmul(q, k.transpose(-2, -1)) * scale  # (B, H, L, S)
         
-        # Apply causal mask if needed
         if self.is_causal:
             causal_mask = torch.triu(
                 torch.ones(L, S, dtype=torch.bool, device=q.device), 

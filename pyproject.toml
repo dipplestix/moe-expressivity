@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "captum>=0.8.0",
+    "circuitsvis>=1.43.2",
     "marimo>=0.18.4",
     "matplotlib>=3.10.8",
     "torch>=2.9.1",
