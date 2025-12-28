@@ -43,6 +43,12 @@ uv run python train.py --ffn_type glu --num_digits 2
 
 # Disable wandb for local testing
 uv run python train.py --no_wandb --patience 3
+
+# Train with register tokens (inspired by "Vision Transformers Need Registers")
+uv run python train_with_registers.py --num_registers 1 --num_digits 2
+
+# Train with multiple register tokens
+uv run python train_with_registers.py --num_registers 4 --num_digits 2
 ```
 
 ### Options
@@ -50,6 +56,7 @@ uv run python train.py --no_wandb --patience 3
 | Argument | Default | Description |
 |----------|---------|-------------|
 | `--num_digits` | 2 | Number of input digits |
+| `--num_registers` | 1 | Number of register tokens (train_with_registers.py only) |
 | `--model_dim` | 64 | Model dimension |
 | `--num_heads` | 4 | Number of attention heads |
 | `--ffn_type` | ffn | FFN type: `ffn` or `glu` |
@@ -84,6 +91,7 @@ uv run marimo edit captum_demo.py
 │   ├── components.py          # MHA, FFN, GLU implementations
 │   └── model.py               # OneLayerTransformer
 ├── train.py                   # Training script
+├── train_with_registers.py    # Training with register tokens
 ├── ffn_activation_analysis.py # FFN activation patterns (Marimo)
 ├── tl_activation_analysis.py  # TransformerLens analysis (Marimo)
 ├── captum_demo.py             # Captum interpretability demo (Marimo)
