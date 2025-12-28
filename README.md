@@ -62,14 +62,32 @@ uv run python train.py --no_wandb --patience 3
 | `--checkpoint_dir` | checkpoints | Checkpoint directory |
 | `--no_wandb` | False | Disable wandb logging |
 
+## Analysis Notebooks
+
+The project includes [Marimo](https://marimo.io/) notebooks for interpretability analysis:
+
+```bash
+# FFN activation analysis for digit overflow patterns
+uv run marimo edit ffn_activation_analysis.py
+
+# TransformerLens-based activation analysis
+uv run marimo edit tl_activation_analysis.py
+
+# Captum interpretability demo
+uv run marimo edit captum_demo.py
+```
+
 ## Project Structure
 
 ```
 ├── model/
-│   ├── components.py   # MHA, FFN, GLU implementations
-│   └── model.py        # OneLayerTransformer
-├── train.py            # Training script
-└── checkpoints/        # Saved models
+│   ├── components.py          # MHA, FFN, GLU implementations
+│   └── model.py               # OneLayerTransformer
+├── train.py                   # Training script
+├── ffn_activation_analysis.py # FFN activation patterns (Marimo)
+├── tl_activation_analysis.py  # TransformerLens analysis (Marimo)
+├── captum_demo.py             # Captum interpretability demo (Marimo)
+└── checkpoints/               # Saved models
 ```
 
 ## Status
