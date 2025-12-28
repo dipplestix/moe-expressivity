@@ -138,6 +138,8 @@ def main():
     parser.add_argument('--checkpoint_dir', type=str, default='checkpoints')
     parser.add_argument('--wandb_project', type=str, default='add-7-transformer')
     parser.add_argument('--no_wandb', action='store_true')
+    parser.add_argument('--use_norm', dest='use_norm', action='store_true', default=True, help='Enable RMSNorm layers')
+    parser.add_argument('--no_use_norm', dest='use_norm', action='store_false', help='Disable RMSNorm layers')
     args = parser.parse_args()
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -153,6 +155,7 @@ def main():
         num_heads=args.num_heads,
         ffn_type=args.ffn_type,
         vocab_size=VOCAB_SIZE,
+        use_norm=args.use_norm,
     ).to(device)
 
     print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")

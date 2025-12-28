@@ -12,20 +12,22 @@ class OneLayerTransformer(nn.Module):
     dropout=0.0,
     vocab_size=10,
     max_seq_len=128,
+    use_norm=True,
     ):
         super().__init__()
         self.model_dim = model_dim
         self.num_heads = num_heads
         self.ffn_type = ffn_type
         self.dropout = dropout
+        self.use_norm = use_norm
 
         self.vocab = nn.Embedding(vocab_size, model_dim)
         self.pos_embed = nn.Embedding(max_seq_len, model_dim)
 
-        self.atn_norm = nn.RMSNorm(model_dim)
+        self.atn_norm = nn.RMSNorm(model_dim) if use_norm else nn.Identity()
         self.atn = MHA(d_model=model_dim, num_heads=num_heads, dropout=dropout)
 
-        self.ffn_norm = nn.RMSNorm(model_dim)
+        self.ffn_norm = nn.RMSNorm(model_dim) if use_norm else nn.Identity()
         if ffn_type == "ffn":   
             intermediate_dim = model_dim * 4
             self.ffn = FFN(input_dim=model_dim, intermediate_dim=intermediate_dim, output_dim=model_dim, activation=nn.SiLU)
@@ -35,7 +37,7 @@ class OneLayerTransformer(nn.Module):
         else:
             raise ValueError(f"Invalid FFN type: {ffn_type}")
 
-        self.out_norm = nn.RMSNorm(model_dim)
+        self.out_norm = nn.RMSNorm(model_dim) if use_norm else nn.Identity()
 
 
     def forward(self, x):
