@@ -2,7 +2,13 @@
 
 Investigating how replacing dense FFN with Mixture of Experts changes the computation structure, learning dynamics, and expert specialization in 1-layer transformers on algorithmic tasks.
 
-## Research Questions
+## Guiding Research Question
+
+**How does the choice of FFN architecture affect what the attention mechanism learns?**
+
+We compare four architectures (matched for parameter count): standard FFN, GLU, MoE (FFN experts), and MoE-GLU. Inspired by Yuan et al. (2025) which analyzes attention patterns in arithmetic tasks.
+
+### Sub-questions
 
 1. How does MoE change where computation happens (attention vs FFN)?
 2. Does MoE's routing bottleneck affect learning dynamics (grokking)?
