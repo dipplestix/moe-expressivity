@@ -1,30 +1,32 @@
-# MoE Expressivity
+# How Mixture-of-Experts Changes Computation in Small Transformers
 
-Investigating how different FFN architectures affect what attention learns in a minimal transformer setting.
+Investigating how replacing dense FFN with Mixture of Experts changes the computation structure, learning dynamics, and expert specialization in 1-layer transformers on algorithmic tasks.
 
-## Motivation
+## Research Questions
 
-We train a one-layer transformer to add 7 to a number (represented digit-by-digit in reversed order). This task has a simple, well-defined structure:
+1. How does MoE change where computation happens (attention vs FFN)?
+2. Does MoE's routing bottleneck affect learning dynamics (grokking)?
+3. Do experts specialize by functional role?
+4. How does GLU interact with MoE and interpretability?
 
-1. **First digit:** Add 7 (may overflow)
-2. **Second digit:** Add 1 if first digit overflows (>=10)
-3. **All other digits:** Add 1 if there's a carry chain (all preceding digits were 9 and overflowed)
+## Tasks
 
-Example: `593 + 7 = 600`
-- Input (reversed): `3 9 5`
-- Output (reversed): `0 0 6`
-- Pattern: 3+7=10 (overflow) -> 9+1=10 (overflow) -> 5+1=6
+| Task | Description | What it tests |
+|------|-------------|---------------|
+| **Modular Addition** | (a+b) mod 113, Nanda et al. (2023) | Grokking dynamics, Fourier analysis |
+| **Add-7** | Digit-by-digit x+7 with carry propagation | Computation structure, expert specialization |
+| **Histogram** | Count token frequencies in a sequence, Glorot et al. (2025) | Validation of computation redistribution |
 
-## Research Question
+## Architecture Variants
 
-How does the choice of FFN architecture affect what the attention mechanism learns?
+Four FFN variants compared in a 1-layer transformer (embedding + attention + FFN + output):
 
-We compare three architectures (matched for parameter count):
-1. **Standard FFN** - Dense feedforward with 4x hidden dimension
-2. **GLU** - Gated Linear Unit
-3. **MoE** - Mixture of Experts (with both FFN and GLU variants)
-
-Inspired by [Yuan et al. (2025)](https://arxiv.org/abs/2506.01115) which analyzes attention patterns in arithmetic tasks.
+| Variant | Description |
+|---------|-------------|
+| FFN | Standard dense feed-forward (GELU activation) |
+| GLU | Gated Linear Unit (SiLU gate x linear projection) |
+| MoE | 4 FFN experts with top-1 routing + load-balancing loss |
+| MoE-GLU | 4 GLU experts with top-1 routing + load-balancing loss |
 
 ## Installation
 
@@ -32,72 +34,49 @@ Inspired by [Yuan et al. (2025)](https://arxiv.org/abs/2506.01115) which analyze
 uv sync
 ```
 
-## Usage
+## Quick Start
 
 ```bash
-# Train with standard FFN
-uv run python train.py --ffn_type ffn --num_digits 2
+# Train one model
+.venv/bin/python train.py --ffn_type moe --num_digits 3 --no_wandb
 
-# Train with GLU
-uv run python train.py --ffn_type glu --num_digits 2
+# Run all experiments for a task (see scripts/README.md for full list)
+bash scripts/run_multiseed.sh
 
-# Disable wandb for local testing
-uv run python train.py --no_wandb --patience 3
-
-# Train with register tokens (inspired by "Vision Transformers Need Registers")
-uv run python train_with_registers.py --num_registers 1 --num_digits 2
-
-# Train with multiple register tokens
-uv run python train_with_registers.py --num_registers 4 --num_digits 2
-```
-
-### Options
-
-| Argument | Default | Description |
-|----------|---------|-------------|
-| `--num_digits` | 2 | Number of input digits |
-| `--num_registers` | 1 | Number of register tokens (train_with_registers.py only) |
-| `--model_dim` | 64 | Model dimension |
-| `--num_heads` | 4 | Number of attention heads |
-| `--ffn_type` | ffn | FFN type: `ffn` or `glu` |
-| `--batch_size` | 128 | Batch size |
-| `--lr` | 1e-3 | Learning rate |
-| `--max_grad_norm` | 1.0 | Gradient clipping |
-| `--steps` | 5000 | Max training steps |
-| `--eval_interval` | 100 | Evaluation frequency |
-| `--patience` | 5 | Early stopping patience |
-| `--checkpoint_dir` | checkpoints | Checkpoint directory |
-| `--no_wandb` | False | Disable wandb logging |
-
-## Analysis Notebooks
-
-The project includes [Marimo](https://marimo.io/) notebooks for interpretability analysis:
-
-```bash
-# FFN activation analysis for digit overflow patterns
-uv run marimo edit ffn_activation_analysis.py
-
-# TransformerLens-based activation analysis
-uv run marimo edit tl_activation_analysis.py
-
-# Captum interpretability demo
-uv run marimo edit captum_demo.py
+# Generate figures (see analysis/README.md)
+.venv/bin/python analysis/visualize_results.py
 ```
 
 ## Project Structure
 
 ```
-├── model/
-│   ├── components.py          # MHA, FFN, GLU implementations
-│   └── model.py               # OneLayerTransformer
-├── train.py                   # Training script
-├── train_with_registers.py    # Training with register tokens
-├── ffn_activation_analysis.py # FFN activation patterns (Marimo)
-├── tl_activation_analysis.py  # TransformerLens analysis (Marimo)
-├── captum_demo.py             # Captum interpretability demo (Marimo)
-└── checkpoints/               # Saved models
+model/                     # Architecture code (see model/README.md)
+formerlens/                # TransformerLens-compatible hooked models (see formerlens/README.md)
+data/                      # Dataset classes (see data/README.md)
+scripts/                   # Experiment runner scripts (see scripts/README.md)
+analysis/                  # Analysis and visualization (see analysis/README.md)
+figures/                   # Generated figures
+checkpoints/               # Trained model checkpoints
+
+train.py                   # Add-7 training script
+train_modular_addition.py  # Modular addition training script
+train_histogram.py         # Histogram counting training script
+
+results_all_experiments.md # Complete experiment results and findings
+experiments.md             # Original experiment plan
 ```
 
-## Status
+## Key Findings
 
-Work in progress. MoE implementation coming soon.
+See `results_all_experiments.md` for full details.
+
+1. **MoE redistributes computation from FFN to attention** — On add-7, zeroing FFN drops dense models to 9.5% but MoE retains 55%. Per-position analysis shows MoE pushes easy operations into attention.
+2. **MoE accelerates grokking** — 2-3x faster on modular addition, requiring both multiple experts (E=1 fails) and hard routing (top-2 fails). Effect scales with model width.
+3. **GLU hides internal structure** — Fourier concentration drops from 0.44 to 0.07, despite same accuracy. Interpretability warning for activation-based methods.
+4. **MoE-GLU experts partially specialize by operation type** — Routing aligns with +7/+1/+0 operations on add-7, confirmed by expert ablation.
+
+## References
+
+- Nanda et al. (2023) "Progress measures for grokking via mechanistic interpretability"
+- Quirke & Barez (2024) "Understanding Addition in Transformers"
+- Glorot et al. (2025) "Counting in Small Transformers: The Delicate Interplay between Attention and Feed-Forward Layers"

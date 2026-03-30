@@ -9,7 +9,8 @@ dependencies = [
     "circuitsvis>=1.43.2",
     "marimo>=0.18.4",
     "matplotlib>=3.10.8",
-    "torch>=2.9.1",
+    "pyarrow<19",
+    "torch>=2.9.1,<2.10",
     "transformer-lens>=2.16.1",
     "wandb>=0.23.1",
 ]

@@ -1,0 +1,27 @@
+
+Large Experiments to run (will need re-training and need to recompute):
+- From the paper "Counting in Small Transformers: The Delicate Interplay
+between Attention and Feed-Forward Layers" :
+    - Create “learning regimes” phase diagram for dense vs GLU vs MoE:
+        - Mimic their sweeps over (d, p), but for you use:
+	        • d_{\text{model}} (embedding/model width)
+	        • Dense FFN width p
+	        • GLU (same parameter budget as dense)
+	        • MoE: number of experts E, expert width p_e, top-1 routing, load-balancing weight
+        - Plot (stratified by carry length L):
+	        • exact match
+	        • per-digit accuracy
+	        • per-token op accuracy for o_t\in\{+7,+1,+0\}
+        - Goal of test:
+	        • “relation-based” analogue = attention computes carry-reach selection; FFN just executes digit mapping
+	        • “inventory-based” analogue = FFN/MoE memorizes case distinctions (e.g., digit×carry patterns) and attention is more passive
+
+- Test BOS/Scratchpad analogue:
+    - Add special token for attention based carry propogation. 
+    - Might reduce relaince on MoE specialization?
+
+
+Smaller Experiments:
+-
+
+

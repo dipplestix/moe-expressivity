@@ -28,12 +28,14 @@ Usage:
 """
 
 from .hooked_former import HookedOneLayerTransformer
-from .hooked_components import HookedFFN, HookedGLU, HookedMHA
+from .hooked_components import HookedFFN, HookedGLU, HookedMHA, HookedMoE, HookedMoEGLU
 
 __all__ = [
     "HookedOneLayerTransformer",
     "HookedFFN",
-    "HookedGLU", 
+    "HookedGLU",
     "HookedMHA",
+    "HookedMoE", #FFN
+    "HookedMoEGLU"
 ]
 

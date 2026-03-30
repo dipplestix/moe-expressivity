@@ -4,6 +4,10 @@ import torch.nn.functional as F
 from typing import Optional
 from transformer_lens.hook_points import HookPoint
 
+import sys
+sys.path.insert(0, "model")
+from components import resolve_activation
+
 
 class HookedFFN(nn.Module):
     """
@@ -98,6 +102,8 @@ class HookedGLU(nn.Module):
         out = self.hook_out(out)
 
         return out
+
+
 
 
 class HookedMHA(nn.Module):
@@ -199,3 +205,148 @@ class HookedMHA(nn.Module):
 
         return y
 
+
+class HookedMoE(nn.Module):
+    """
+    Mixture of Experts with hook points for routing and per-expert analysis.
+
+    Hook points:
+        - hook_router_logits: Raw router logits (B*T, E)
+        - hook_router_probs: Router probabilities after softmax (B*T, E)
+        - hook_expert_selection: Top-k expert indices (B*T, k)
+        - hook_expert_weights: Top-k expert weights (B*T, k)
+        - experts.{i}.hook_pre_act: Per-expert pre-activation
+        - experts.{i}.hook_post_act: Per-expert post-activation
+        - hook_out: Final MoE output
+    """
+
+    def __init__(self, input_dim, intermediate_dim, output_dim, num_experts=4, top_k=1, activation=nn.SiLU):
+        super().__init__()
+        self.input_dim = input_dim
+        self.num_experts = num_experts
+        self.top_k = top_k
+
+        self.router = nn.Linear(input_dim, num_experts, bias=False)
+
+        expert_intermediate = intermediate_dim // num_experts
+        self.experts = nn.ModuleList([
+            HookedFFN(input_dim, expert_intermediate, output_dim, activation=activation)
+            for _ in range(num_experts)
+        ])
+
+        self._aux_loss = torch.tensor(0.0)
+
+        # Hook points
+        self.hook_router_logits = HookPoint()
+        self.hook_router_probs = HookPoint()
+        self.hook_expert_selection = HookPoint()
+        self.hook_expert_weights = HookPoint()
+        self.hook_out = HookPoint()
+
+    def forward(self, x):
+        B, T, D = x.shape
+        x_flat = x.view(B * T, D)
+
+        router_logits = self.router(x_flat)
+        router_logits = self.hook_router_logits(router_logits)
+
+        router_probs = F.softmax(router_logits, dim=-1)
+        router_probs = self.hook_router_probs(router_probs)
+
+        topk_weights, topk_indices = torch.topk(router_probs, self.top_k, dim=-1)
+        topk_weights = topk_weights / topk_weights.sum(dim=-1, keepdim=True)
+
+        topk_indices = self.hook_expert_selection(topk_indices)
+        topk_weights = self.hook_expert_weights(topk_weights)
+
+        # Load-balancing loss
+        one_hot = F.one_hot(topk_indices, self.num_experts).float()
+        tokens_per_expert = one_hot.sum(dim=1).mean(dim=0)
+        prob_per_expert = router_probs.mean(dim=0)
+        self._aux_loss = self.num_experts * (tokens_per_expert * prob_per_expert).sum()
+
+        # Dispatch to experts (experts already have their own hooks via HookedFFN)
+        out = torch.zeros(B * T, self.experts[0].output_dim, device=x.device, dtype=x.dtype)
+        for k_idx in range(self.top_k):
+            for e_idx in range(self.num_experts):
+                mask = topk_indices[:, k_idx] == e_idx
+                if mask.any():
+                    expert_out = self.experts[e_idx](x_flat[mask])
+                    out[mask] += topk_weights[mask, k_idx].unsqueeze(-1) * expert_out
+
+        out = out.view(B, T, -1)
+        out = self.hook_out(out)
+        return out
+
+
+class HookedMoEGLU(nn.Module):
+    """
+    Mixture of Experts GLU with hook points for routing and per-expert analysis.
+
+    Hook points:
+        - hook_router_logits: Raw router logits (B*T, E)
+        - hook_router_probs: Router probabilities after softmax (B*T, E)
+        - hook_expert_selection: Top-k expert indices (B*T, k)
+        - hook_expert_weights: Top-k expert weights (B*T, k)
+        - experts.{i}.hook_pre_act: Per-expert pre-activation
+        - experts.{i}.hook_post_act: Per-expert post-activation
+        - hook_out: Final MoE output
+    """
+
+    def __init__(self, input_dim, intermediate_dim, output_dim, num_experts=4, top_k=1, activation=nn.SiLU):
+        super().__init__()
+        self.input_dim = input_dim
+        self.num_experts = num_experts
+        self.top_k = top_k
+
+        self.router = nn.Linear(input_dim, num_experts, bias=False)
+
+        expert_intermediate = intermediate_dim // num_experts
+        self.experts = nn.ModuleList([
+            HookedGLU(input_dim, expert_intermediate, output_dim, activation=activation)
+            for _ in range(num_experts)
+        ])
+
+        self._aux_loss = torch.tensor(0.0)
+
+        # Hook points
+        self.hook_router_logits = HookPoint()
+        self.hook_router_probs = HookPoint()
+        self.hook_expert_selection = HookPoint()
+        self.hook_expert_weights = HookPoint()
+        self.hook_out = HookPoint()
+
+    def forward(self, x):
+        B, T, D = x.shape
+        x_flat = x.view(B * T, D)
+
+        router_logits = self.router(x_flat)
+        router_logits = self.hook_router_logits(router_logits)
+
+        router_probs = F.softmax(router_logits, dim=-1)
+        router_probs = self.hook_router_probs(router_probs)
+
+        topk_weights, topk_indices = torch.topk(router_probs, self.top_k, dim=-1)
+        topk_weights = topk_weights / topk_weights.sum(dim=-1, keepdim=True)
+
+        topk_indices = self.hook_expert_selection(topk_indices)
+        topk_weights = self.hook_expert_weights(topk_weights)
+
+        # Load-balancing loss
+        one_hot = F.one_hot(topk_indices, self.num_experts).float()
+        tokens_per_expert = one_hot.sum(dim=1).mean(dim=0)
+        prob_per_expert = router_probs.mean(dim=0)
+        self._aux_loss = self.num_experts * (tokens_per_expert * prob_per_expert).sum()
+
+        # Dispatch to experts (experts already have their own hooks via HookedFFN)
+        out = torch.zeros(B * T, self.experts[0].output_dim, device=x.device, dtype=x.dtype)
+        for k_idx in range(self.top_k):
+            for e_idx in range(self.num_experts):
+                mask = topk_indices[:, k_idx] == e_idx
+                if mask.any():
+                    expert_out = self.experts[e_idx](x_flat[mask])
+                    out[mask] += topk_weights[mask, k_idx].unsqueeze(-1) * expert_out
+
+        out = out.view(B, T, -1)
+        out = self.hook_out(out)
+        return out

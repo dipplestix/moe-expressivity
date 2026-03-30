@@ -4,6 +4,13 @@ import torch.nn.functional as F
 from typing import Optional
 
 
+def resolve_activation(activation):
+    """Resolve activation from string or nn.Module class."""
+    if isinstance(activation, str):
+        return {"silu": nn.SiLU, "gelu": nn.GELU, "relu": nn.ReLU}[activation.lower()]
+    return activation
+
+
 class FFN(nn.Module):
     def __init__(self, input_dim, intermediate_dim, output_dim, activation=nn.SiLU):
         super().__init__()
@@ -106,3 +113,108 @@ class MHA(nn.Module):
         y = self.o_proj(y)
 
         return y
+
+
+class MoE(nn.Module):
+    """Mixture of Experts layer with Switch-style top-k routing."""
+
+    def __init__(self, input_dim, intermediate_dim, output_dim, num_experts=4, top_k=1, activation=nn.SiLU):
+        super().__init__()
+        self.input_dim = input_dim
+        self.num_experts = num_experts
+        self.top_k = top_k
+
+        self.router = nn.Linear(input_dim, num_experts, bias=False)
+
+        expert_intermediate = intermediate_dim // num_experts
+        self.experts = nn.ModuleList([
+            FFN(input_dim, expert_intermediate, output_dim, activation=activation)
+            for _ in range(num_experts)
+        ])
+
+        self._aux_loss = torch.tensor(0.0)
+
+    def forward(self, x):
+        # x: (B, T, D)
+        B, T, D = x.shape
+        x_flat = x.view(B * T, D)
+
+        router_logits = self.router(x_flat)  # (B*T, E)
+        router_probs = F.softmax(router_logits, dim=-1)  # (B*T, E)
+
+        topk_weights, topk_indices = torch.topk(router_probs, self.top_k, dim=-1)  # (B*T, k)
+        #check need to normalize?
+        topk_weights = topk_weights / topk_weights.sum(dim=-1, keepdim=True)  # renormalize
+
+        # Load-balancing loss: E * sum(f_i * P_i)
+        # f_i = fraction of tokens routed to expert i
+        one_hot = F.one_hot(topk_indices, self.num_experts).float()  # (B*T, k, E)
+        tokens_per_expert = one_hot.sum(dim=1).mean(dim=0)  # (E,) fraction routed
+        prob_per_expert = router_probs.mean(dim=0)  # (E,) mean probability
+        self._aux_loss = self.num_experts * (tokens_per_expert * prob_per_expert).sum()
+
+        # Dispatch to experts
+        out = torch.zeros(B * T, self.experts[0].output_dim, device=x.device, dtype=x.dtype)
+        for k_idx in range(self.top_k):
+            for e_idx in range(self.num_experts):
+                mask = topk_indices[:, k_idx] == e_idx
+                if mask.any():
+                    expert_out = self.experts[e_idx](x_flat[mask])
+                    out[mask] += topk_weights[mask, k_idx].unsqueeze(-1) * expert_out
+
+        return out.view(B, T, -1)
+
+class MoEGLU(nn.Module):
+    "MoE-glu"
+    def __init__(self, input_dim, intermediate_dim, output_dim, num_experts=4, top_k=1, activation=nn.SiLU):
+        super().__init__()
+        self.input_dim = input_dim
+        self.num_experts = num_experts
+        self.top_k = top_k
+
+        self.router = nn.Linear(input_dim, num_experts, bias=False)
+
+        expert_intermediate = intermediate_dim // num_experts
+        self.experts = nn.ModuleList([
+            GLU(input_dim, expert_intermediate, output_dim, activation=activation)
+            for _ in range(num_experts)
+        ])
+
+        self._aux_loss = torch.tensor(0.0)
+
+    def forward(self, x):
+        # x: (B, T, D)
+        B, T, D = x.shape
+        x_flat = x.view(B * T, D)
+
+        router_logits = self.router(x_flat)  # (B*T, E)
+        router_probs = F.softmax(router_logits, dim=-1)  # (B*T, E)
+
+        topk_weights, topk_indices = torch.topk(router_probs, self.top_k, dim=-1)  # (B*T, k)
+        #check need to normalize?
+        topk_weights = topk_weights / topk_weights.sum(dim=-1, keepdim=True)  # renormalize
+
+        # Load-balancing loss: E * sum(f_i * P_i)
+        # f_i = fraction of tokens routed to expert i
+        one_hot = F.one_hot(topk_indices, self.num_experts).float()  # (B*T, k, E)
+        tokens_per_expert = one_hot.sum(dim=1).mean(dim=0)  # (E,) fraction routed
+        prob_per_expert = router_probs.mean(dim=0)  # (E,) mean probability
+        self._aux_loss = self.num_experts * (tokens_per_expert * prob_per_expert).sum()
+
+        # Dispatch to experts
+        out = torch.zeros(B * T, self.experts[0].output_dim, device=x.device, dtype=x.dtype)
+        for k_idx in range(self.top_k):
+            for e_idx in range(self.num_experts):
+                mask = topk_indices[:, k_idx] == e_idx
+                if mask.any():
+                    expert_out = self.experts[e_idx](x_flat[mask])
+                    out[mask] += topk_weights[mask, k_idx].unsqueeze(-1) * expert_out
+
+        return out.view(B, T, -1)
+
+
+
+
+
+    
+
