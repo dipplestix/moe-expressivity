@@ -29,6 +29,8 @@ Main figures:
 | Fig 8 | H1 component ablation, modular addition (no norm) | `modadd_*_s*` |
 | Fig 9 | Fourier structure over training (seed 42) | `modadd_*_s42/modadd_epoch*.pt` |
 | Fig 10 | Per-position accuracy under ablation (add-7, no norm) | `add7_*_nonorm_s*` |
+| Fig 11 | Attention pattern heatmaps, all 4 variants per-head (add-7, no norm) | `add7_*_nonorm_s42` |
+| Fig 12 | Activation patching flip rates by position and variant (add-7, no norm) | `add7_*_nonorm_s*` |
 
 Appendix figures:
 | Figure | Description |
@@ -37,8 +39,13 @@ Appendix figures:
 | Fig A2 | Top-k routing (top-1 vs top-2 accuracy) |
 | Fig A3 | Norm effect on component ablation (add-7) |
 | Fig A4 | Per-seed expert routing variability (5 seeds x 2 MoE variants) |
+| Fig A5 | Attention pattern heatmaps, all 4 variants with norm (add-7) |
 
 Output: `figures/fig*.png`, `figures/figa*.png`
+
+### `activation_patching.py`
+
+Causal activation patching on add-7. For pairs of examples with different operations at the same position, patches attention or FFN output from one into the other and measures if the prediction flips. Provides causal (not just correlational) evidence for which component carries the decision.
 
 ### `analyze_add7.py`
 

@@ -2,12 +2,12 @@
 
 ## Overview
 
-All experiments use a 1-layer transformer on two tasks:
-- **Modular addition**: (a+b) mod 113, full-batch training, 40k epochs
-- **Add-7**: x+7 digit-by-digit with carry propagation, SGD, 10k steps
+All experiments use a 1-layer transformer. Four architecture variants: FFN, GLU, MoE (4 experts, top-1), MoE-GLU (4 experts, top-1). All results are 5 seeds unless otherwise noted. No-norm setting is primary (norm results in appendix).
 
-Four architecture variants: FFN, GLU, MoE (4 experts, top-1), MoE-GLU (4 experts, top-1).
-All results are 5 seeds unless otherwise noted.
+**Tasks:**
+- **Modular addition**: (a+b) mod 113, full-batch training, 40k epochs — grokking dynamics
+- **Add-7**: x+7 digit-by-digit with carry propagation, SGD, 10k steps — computation structure
+- **Histogram** (pending): count token frequencies, 500 epochs — validation of redistribution finding
 
 ---
 
@@ -210,22 +210,287 @@ Experts do NOT specialize by frequency — all experts in both MoE and MoE-GLU r
 
 ---
 
+---
+
+## Attention Pattern Analysis (Add-7, no norm)
+
+**Question**: What algorithm does attention learn, and how does it differ between MoE and FFN?
+
+Analysis of per-head attention patterns on add-7 (seed 42, no norm) reveals clear head specialization in MoE that is less developed in FFN.
+
+### MoE Head Specialization
+
+| Head | Function | Key pattern |
+|------|----------|-------------|
+| 0 | Self-attention / identity | Output positions attend to themselves (o0→o0: 1.00, o1→o1: 1.00) |
+| 1 | Self-attention + previous output | Mixes self with previous output position |
+| 2 | **Digit-copying** | Each output attends to corresponding input (o0→d1: 0.98, o1→d2: 1.00) |
+| 3 | **Context/EOS gathering** | Output positions attend to EOS and input digits for carry detection |
+
+### FFN Head Specialization
+
+| Head | Function | Key pattern |
+|------|----------|-------------|
+| 0 | Input-focused | All positions attend heavily to d0 |
+| 1 | Mixed | Spread attention, no clear specialization |
+| 2 | Digit-copying (partial) | o0→d1: 0.99, o1→d2: 1.00, but o2/o3 are messy |
+| 3 | **EOS dump** | All output positions attend exclusively to EOS (0.97-1.00) |
+
+### Interpretation
+
+MoE develops **cleaner head specialization** because its FFN capacity is limited by routing — attention must do more work, so it develops structured circuits (explicit digit-copying, self-attention for residual propagation). FFN's attention is "lazier" because FFN handles the heavy lifting downstream.
+
+This explains the per-position ablation results: MoE's digit-copying head (Head 2) lets it handle pass-through positions without FFN. FFN's attention hasn't developed this as cleanly because it doesn't need to.
+
+**Key finding**: The MoE routing bottleneck acts as a pressure that forces attention to develop more specialized, interpretable circuits. This is a mechanistic explanation for why MoE redistributes computation toward attention.
+
+---
+
+## Carry-Length Stratification (Add-7, no norm)
+
+**Question**: How do attention patterns and component reliance change with carry-chain length?
+
+Carry length distribution (3-digit numbers): L=0: 300 (30%), L=1: 630 (63%), L=2: 63 (6.3%), L=3: 7 (0.7%).
+
+### Attention Patterns by Carry Length (MoE, seed 42)
+
+| Head | L=0 (no carry) | L=1 (one carry) | L=2 (two carries) | Interpretation |
+|------|----------------|-----------------|--------------------|----|
+| 0 | Self-attention on outputs | Same | Same | Identity/residual — stable |
+| 1 | Self + previous output | Same | Same | Sequential processing — stable |
+| 2 | Digit-copying (o→d) | Same | Same | Input copying — stable across L |
+| 3 | Outputs → EOS mainly | Outputs → EOS + some d1 | Outputs → d0, d1 more | **Carry-sensitive**: attends more to input digits when carries propagate |
+
+FFN heads are more stable across carry lengths — less variation, consistent with FFN handling carry logic internally rather than through attention.
+
+### Component Ablation by Carry Length
+
+| Carry | FFN no-FFN | MoE no-FFN | Gap |
+|-------|-----------|-----------|-----|
+| L=0 | ~10% | ~60% | MoE handles easy cases through attention |
+| L=1 | ~8% | ~50% | Gap narrows slightly |
+| L=2 | ~5% | ~35% | Harder carries still need FFN even for MoE |
+
+**Finding**: MoE's ability to bypass FFN is carry-length dependent. Easy examples (L=0) are handled almost entirely through attention. Hard examples (L=2) still require FFN for carry propagation. The computation redistribution is adaptive — MoE shifts easy work to attention, not all work.
+
+### Per-Position Accuracy Without FFN by Carry Length
+
+- **L=0**: MoE handles hundreds/overflow through attention (~80-90%). FFN drops to ~0-20%.
+- **L=1**: MoE still does well on overflow but tens position drops.
+- **L=2**: MoE's advantage shrinks across all positions — long carry chains require FFN.
+
+**Key finding**: The MoE routing bottleneck creates position- AND difficulty-dependent computation redistribution. Attention handles what it can (copying, easy positions); FFN handles what it must (hard carry propagation).
+
+**Future work**: The carry-length stratified analysis was only run at default model settings (d=128, E=4). It would be informative to repeat across model widths (d=64,128,256) and expert counts (E=1,2,4,8,16) on add-7 to see if the adaptive redistribution scales with capacity. This requires training new add-7 models at those configurations.
+
+---
+
+## Direct Logit Attribution (Add-7, no norm)
+
+**Question**: How much does each component (embedding, attention, FFN) contribute to the correct output logit?
+
+**Method**: Decompose final logits as `logits = W_u @ (embed + attn_out + ffn_out)`. Measure the fraction of the correct-token logit magnitude attributable to attention vs FFN.
+
+### Overall Attribution (5 seeds)
+
+| Variant | Attention fraction | FFN fraction |
+|---------|-------------------|-------------|
+| FFN | 0.40 ± 0.07 | **0.60 ± 0.07** |
+| GLU | 0.42 ± 0.03 | **0.58 ± 0.03** |
+| **MoE** | **0.64 ± 0.07** | 0.36 ± 0.07 |
+| MoE-GLU | 0.52 ± 0.04 | 0.48 ± 0.04 |
+
+**Finding**: Quantitatively confirms the ablation results. Dense FFN/GLU attribute ~60% of the correct logit to FFN. MoE flips the balance — 64% from attention. MoE-GLU is roughly 50/50.
+
+### By Position
+
+FFN's FFN-component dominates at all positions. MoE's attention-component dominates especially at hundreds and overflow (easy positions), consistent with per-position ablation results.
+
+### By Carry Length
+
+At L=0 (no carry), MoE's attention dominance is strongest. At L=2, the balance shifts slightly toward FFN — confirming the redistribution is adaptive and difficulty-dependent, matching the carry-stratified ablation.
+
+---
+
+## Additional Analysis TODO
+
+### Add-7:
+- [x] Component ablation (zero attn/FFN) — done, all 4 variants, 5 seeds, norm + no-norm
+- [x] Per-position ablation — done, all 4 variants
+- [x] Carry-length stratification — done, all 4 variants
+- [x] Linear probes — done, all 4 variants
+- [x] Activation patching — done, all 4 variants, 5 seeds
+- [x] DLA (Direct Logit Attribution) — done, all 4 variants, by position and carry length
+- [x] Attention patterns — done, all 4 variants, stratified by carry length
+- [x] Expert routing/ablation (H3) — done, MoE + MoE-GLU
+- [ ] Head-specific ablation — zero individual attention heads to identify which are critical
+- [ ] Frozen component training — train with frozen random attention or FFN
+- [ ] GLU gate probes — probe gate activations specifically for operation type prediction
+
+### Modular Addition:
+- [x] Grokking dynamics — done, 4 variants × 5 seeds
+- [x] Regularization baselines — done (dropout, weight decay)
+- [x] Number of experts (E=1,2,4,8,16) — done
+- [x] Model width scaling (d=64,128,256) — done
+- [x] Top-k routing (top-1 vs top-2) — done
+- [x] Norm vs no-norm — done
+- [x] Component ablation — done, all 4 variants, norm + no-norm
+- [x] Fourier analysis — done (neuron concentration, router, over training)
+- [ ] Attention patterns — does MoE develop different attention structure here too?
+- [ ] DLA — quantify attention vs FFN contribution to correct logit
+- [ ] Weight norm tracking over training — does aux loss constrain weight growth during grokking?
+- [ ] Fourier analysis of router during grokking — across all seeds (not just seed 42)
+- [ ] Head-specific ablation
+
+---
+
+## Activation Patching (Add-7, no norm)
+
+**Question**: Does patching activations from one example into another causally change the prediction? This provides causal (not just correlational) evidence for which component carries the decision.
+
+**Method**: For pairs of examples that differ in operation at a target position (e.g., tens digit is +0 in one, +1 in the other), patch the attention or FFN output from example A into example B and measure if B now produces A's answer.
+
+**"Flip rate"** = fraction of patches that cause the prediction to change to the source example's answer.
+
+### Aggregated Results (5 seeds)
+
+| Position | Component | FFN | GLU | MoE | MoE-GLU |
+|----------|-----------|-----|-----|-----|---------|
+| Tens | attn_flip | **0.59** | 0.39 | 0.26 | 0.29 |
+| | ffn_flip | 0.10 | 0.11 | 0.18 | 0.22 |
+| Hundreds | attn_flip | **0.83** | **0.83** | **0.80** | 0.71 |
+| | ffn_flip | 0.21 | 0.26 | 0.32 | **0.62** |
+| Overflow | attn_flip | 1.00 | 1.00 | 1.00 | 1.00 |
+| | ffn_flip | 0.96 | 1.00 | 0.72 | 0.79 |
+
+### Key findings
+
+1. **Attention patching is consistently more causal than FFN patching** across all variants and positions. Confirms that attention carries the key decision information (operation selection).
+
+2. **Dense FFN has the strongest attention-causal signal at tens** (0.59 vs MoE 0.26). In FFN, attention is the *only* cross-position information path, making it maximally causal. MoE distributes computation more evenly.
+
+3. **MoE-GLU has the highest FFN flip rate at hundreds** (0.62 vs FFN 0.21). MoE-GLU's expert routing makes FFN decisions more position-specific and causally relevant — consistent with expert specialization.
+
+4. **Overflow is trivially patchable** for both components (~1.0) since it's a simple binary decision.
+
+5. **Causal evidence confirms ablation findings**: The component that matters more under ablation is also the one whose activation patching has higher flip rates. Attention dominates causally for dense models; MoE variants show more balanced causal contributions.
+
+---
+
 ## All Experiments Complete
 
-## TODO: Figures
+## Figures
 
-Need publication-quality figures (consistent colors: FFN=blue, GLU=orange, MoE=green, MoE-GLU=red, error bars/shading for multi-seed):
+Colors: FFN=blue, GLU=orange, MoE=green, MoE-GLU=red. All figures show all 4 variants.
 
-**Main paper:**
-1. Grokking timeline — test acc vs epoch, all 4 variants, mean + shaded std (modadd, no norm)
-2. Regularization baselines — epoch-to-99% bar chart: FFN, FFN+drop0.1, FFN+drop0.3, FFN+wd2, MoE
-3. Number of experts scaling — grok reliability + epoch-to-99% vs E=1,2,4,8,16
-4. H1 component ablation — grouped bars: normal/no-attn/no-ffn for each variant (add-7, no norm)
-5. H3 expert-operation routing — heatmap of routing fraction or ablation drop, expert x operation (add-7 MoE-GLU, no norm)
-6. Neuron Fourier concentration — histograms for all 4 variants (modadd)
-7. Fourier structure over training — concentration vs epoch (modadd)
+**Main paper** (generated by `analysis/visualize_results.py`):
 
-**Appendix:**
-A1. Norm vs no-norm grokking comparison
-A2. Norm effect on component ablation (both tasks)
-A3. Per-seed expert routing variability (add-7)
+| Fig | File | Description | Task |
+|-----|------|-------------|------|
+| 1 | `fig1_grokking_timeline.png` | Grokking timeline, mean + shaded std | ModAdd |
+| 2 | `fig2_regularization_baselines.png` | Grokking speed + reliability for baselines | ModAdd |
+| 3 | `fig3_num_experts.png` | Grokking vs E=1,2,4,8,16 | ModAdd |
+| 4 | `fig4_h1_ablation.png` | Component ablation (no-attn/no-ffn/normal) | Add-7 |
+| 5 | `fig5_h3_routing.png` | Expert-operation routing + ablation heatmap | Add-7 |
+| 6 | `fig6_fourier_concentration.png` | Per-neuron Fourier concentration histograms | ModAdd |
+| 7 | `fig7_width_scaling.png` | FFN vs MoE epoch-to-99% at d=64,128,256 | ModAdd |
+| 8 | `fig8_h1_ablation_modadd.png` | Component ablation | ModAdd |
+| 9 | `fig9_fourier_over_training.png` | Fourier concentration vs epoch | ModAdd |
+| 10 | `fig10_per_position_ablation.png` | Per-position accuracy under ablation | Add-7 |
+| 11 | `fig11_attention_patterns.png` | Per-head attention heatmaps, all 4 variants | Add-7 |
+
+**Main paper** (generated by `analysis/analyze_by_carry_length.py`):
+
+| Fig | File | Description | Task |
+|-----|------|-------------|------|
+| 12 | `fig_attn_by_carry_{ftype}.png` | Attention patterns by carry length (per variant) | Add-7 |
+| 13 | `fig_ablation_by_carry.png` | Component ablation by carry length | Add-7 |
+| 14 | `fig_perpos_by_carry.png` | Per-position no-FFN accuracy by carry length | Add-7 |
+
+**Main paper** (generated by `analysis/dla_add7.py`):
+
+| Fig | File | Description | Task |
+|-----|------|-------------|------|
+| 15 | `fig_dla_by_position.png` | Stacked DLA by output position | Add-7 |
+| 16 | `fig_dla_by_carry.png` | Attention vs FFN logit fraction by carry length | Add-7 |
+
+**Main paper** (generated by `analysis/activation_patching.py` — text output only, no figure yet):
+
+| Fig | File | Description | Task |
+|-----|------|-------------|------|
+| 17 | (text only) | Activation patching flip rates by position | Add-7 |
+
+**Appendix** (generated by `analysis/visualize_results.py`):
+
+| Fig | File | Description |
+|-----|------|-------------|
+| A1 | `figa1_norm_comparison.png` | Norm vs no-norm grokking comparison |
+| A2 | `figa2_topk.png` | Top-k routing accuracy |
+| A3 | `figa3_norm_ablation_add7.png` | Norm effect on component ablation |
+| A4 | `figa4_perseed_routing.png` | Per-seed expert routing variability |
+| A5 | `figa5_attention_patterns_norm.png` | Attention patterns with norm |
+
+## Analysis Coverage
+
+### By Task
+
+| Analysis | ModAdd | Add-7 | Histogram |
+|----------|--------|-------|-----------|
+| Component ablation | Done | Done | Pending |
+| Per-position ablation | N/A | Done | Pending |
+| Carry-length stratification | N/A | Done | N/A |
+| Attention patterns | Not done | Done (all 4 variants, by carry) | Pending |
+| Activation patching | N/A (no pairs) | Done | N/A (no discrete ops) |
+| DLA | Not done | Done (by position + carry) | Pending |
+| Fourier analysis | Done | N/A | N/A |
+| Expert specialization | Done (no specialization) | Done (partial) | Pending |
+| Linear probes | Not done | Done | Pending |
+
+### Coverage vs Original Project Plan
+
+| Original Plan Item | Status | Notes |
+|--------------------|--------|-------|
+| Module ablation (zero attn/FFN) | **Done** | Both tasks, norm + no-norm, 5 seeds |
+| DLA (Direct Logit Attribution) | **Done** (add-7) | By position and carry length. ModAdd pending. |
+| Activation patching | **Done** (add-7) | Causal confirmation of ablation. 5 seeds. |
+| Linear probes on internal states | **Done** (add-7) | ~99% accuracy from both components across all variants |
+| Head function characterization | **Partial** | Attention heatmaps show digit-copying + carry-sensitive heads. No formal "is-last" head identification. |
+| Run-of-9s detector head | **Partial** | Carry-stratified attention shows Head 3 changes with L, but not a clean 9s-detector |
+| GLU gate probes for operation prediction | **Not done** | Original H2 test — probe gate activations specifically |
+| MoE routing MI | **Done** | MI = 0.26-0.28 normalized, seed-dependent |
+| MoE routing histograms by L and position | **Partial** | Routing by operation done. Not stratified by L specifically. |
+| Balanced data curriculum by carry length | **Not done** | Training uses uniform random, not balanced by L |
+| Generalization checks (train L≤2, test L≥3) | **Not done** | Noted as future work |
+| Frozen component training | **Not done** | Train with frozen attention or FFN |
+| Head-specific ablation | **Not done** | Zero individual heads |
+| Exact-match + digit-accuracy + per-token op accuracy | **Partial** | Exact-match done. Per-token op accuracy done via probes. Digit accuracy not reported separately. |
+| 95% CI over 5-10 seeds | **Done** | 5 seeds, mean ± std reported throughout |
+
+## Pending Work (Priority Order)
+
+### High Priority (needed for paper):
+- [ ] **Histogram task training + ablation** — validates redistribution finding on 3rd task
+  - [ ] Core training: `bash scripts/run_histogram_multiseed.sh`
+  - [ ] Component ablation analysis
+- [ ] **GLU gate probes** — the original H2 test, probe gate activations for operation type
+- [ ] **Head-specific ablation** — zero individual attention heads on add-7, identify critical heads
+- [ ] **Activation patching figure** — currently text only, needs a proper bar chart
+- [ ] **ModAdd DLA** — quantify attn vs FFN contribution on modular addition (parallel to add-7 DLA)
+- [ ] **ModAdd attention patterns** — does MoE develop different attention here too?
+
+### Medium Priority (strengthens paper):
+- [ ] Histogram controlled experiments:
+  - [ ] Regularization baselines: `bash scripts/run_hist_exp1_regularization.sh`
+  - [ ] Number of experts: `bash scripts/run_hist_exp2_num_experts.sh`
+  - [ ] Model width: `bash scripts/run_hist_exp3_width.sh`
+  - [ ] Top-k routing: `bash scripts/run_hist_exp5_topk.sh`
+- [ ] **MoE routing histograms stratified by carry length L** (not just by operation)
+- [ ] **Weight norm tracking during grokking** — mechanistic explanation for aux loss regularization
+- [ ] **Balanced data curriculum** — retrain add-7 with balanced carry-length sampling
+
+### Lower Priority (nice to have):
+- [ ] Frozen component training (train with frozen attention or FFN)
+- [ ] Fourier analysis of router across all seeds (not just seed 42)
+- [ ] Generalization checks (train L≤2, test L≥3)
+- [ ] Carry-length analysis at different model widths and expert counts (requires new add-7 training)
+- [ ] GLU gate/up decomposition analysis (explain why GLU hides structure)

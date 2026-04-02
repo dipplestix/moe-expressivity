@@ -25,6 +25,7 @@ matplotlib.rcParams.update({
     'savefig.bbox': 'tight',
 })
 
+sys.path.insert(0, ".")
 sys.path.insert(0, "model")
 from model import OneLayerTransformer
 from data.modular_addition import ModularAdditionDataset
@@ -1129,6 +1130,98 @@ def fig10_per_position_ablation():
     print("Saved fig10_per_position_ablation.png")
 
 
+# ============================================================
+# FIG 11: Attention Pattern Heatmaps — All 4 variants (Add-7, no norm)
+# ============================================================
+def fig11_attention_patterns():
+    pos_labels = ['d0', 'd1', 'd2', 'EOS', 'o0', 'o1', 'o2', 'o3']
+    test_numbers = [123, 456, 193, 993, 500, 295, 399, 100]
+
+    def get_attn_weights(model, n):
+        ind = num_to_reversed_digits(n, NUM_DIGITS)
+        outd = num_to_reversed_digits(n + 7, NUM_DIGITS + 1)
+        seq = ind + [EOS_TOKEN] + outd + [EOS_TOKEN]
+        x = torch.tensor([seq[:-1]], dtype=torch.long)
+
+        pos = torch.arange(x.shape[1])
+        emb = model.vocab(x) + model.pos_embed(pos)
+        normed = model.atn_norm(emb)
+
+        B, T, D = normed.shape
+        H = model.atn.num_heads
+        d_head = D // H
+
+        q = model.atn.q_proj(normed).view(B, T, H, d_head).transpose(1, 2)
+        k = model.atn.k_proj(normed).view(B, T, H, d_head).transpose(1, 2)
+
+        scores = torch.matmul(q, k.transpose(-2, -1)) / (d_head ** 0.5)
+        if model.atn.is_causal:
+            mask = torch.triu(torch.ones(T, T, dtype=torch.bool), diagonal=1)
+            scores.masked_fill_(mask, float('-inf'))
+
+        return torch.softmax(scores, dim=-1)[0].detach().numpy()  # (H, T, T)
+
+    def plot_variant_grid(variant_paths, title, filename):
+        """Plot 4 variants x 4 heads attention grid."""
+        fig, axes = plt.subplots(len(variant_paths), 4, figsize=(20, 5 * len(variant_paths)))
+
+        for row, (model_name, path) in enumerate(variant_paths):
+            model, _ = load_model(path)
+            num_heads = model.atn.num_heads
+
+            all_attn = []
+            for n in test_numbers:
+                all_attn.append(get_attn_weights(model, n))
+            avg_attn = np.mean(all_attn, axis=0)  # (H, T, T)
+
+            for h in range(num_heads):
+                ax = axes[row, h]
+                im = ax.imshow(avg_attn[h], cmap='Blues', vmin=0, vmax=1, aspect='equal')
+                ax.set_xticks(range(len(pos_labels)))
+                ax.set_xticklabels(pos_labels, fontsize=9, rotation=45)
+                ax.set_yticks(range(len(pos_labels)))
+                ax.set_yticklabels(pos_labels if h == 0 else [], fontsize=9)
+
+                if row == 0:
+                    ax.set_title(f"Head {h}", fontsize=12)
+                if h == 0:
+                    ax.set_ylabel(f"{model_name}\n(query)", fontsize=12)
+
+                for i in range(len(pos_labels)):
+                    for j in range(len(pos_labels)):
+                        val = avg_attn[h, i, j]
+                        if val > 0.3:
+                            ax.text(j, i, f"{val:.1f}", ha='center', va='center',
+                                    color='white' if val > 0.6 else 'black', fontsize=8)
+
+        fig.suptitle(title, fontsize=14, y=1.02)
+        fig.tight_layout()
+        fig.savefig(f"figures/{filename}")
+        print(f"Saved {filename}")
+
+    # Main figure: all 4 variants, no norm
+    nonorm_paths = [
+        ('FFN', 'checkpoints/add7_ffn_nonorm_s42/best_model.pt'),
+        ('GLU', 'checkpoints/add7_glu_nonorm_s42/best_model.pt'),
+        ('MoE', 'checkpoints/add7_moe_nonorm_s42/best_model.pt'),
+        ('MoE-GLU', 'checkpoints/add7_moe_glu_nonorm_s42/best_model.pt'),
+    ]
+    plot_variant_grid(nonorm_paths,
+                      "Per-Head Attention Patterns (Add-7, no norm, avg over 8 examples)",
+                      "fig11_attention_patterns.png")
+
+    # Appendix figure: all 4 variants, with norm
+    norm_paths = [
+        ('FFN', 'checkpoints/add7_ffn_s42/best_model.pt'),
+        ('GLU', 'checkpoints/add7_glu_s42/best_model.pt'),
+        ('MoE', 'checkpoints/add7_moe_s42/best_model.pt'),
+        ('MoE-GLU', 'checkpoints/add7_moe_glu_s42/best_model.pt'),
+    ]
+    plot_variant_grid(norm_paths,
+                      "Per-Head Attention Patterns (Add-7, with norm, avg over 8 examples)",
+                      "figa5_attention_patterns_norm.png")
+
+
 if __name__ == "__main__":
     os.makedirs("figures", exist_ok=True)
 
@@ -1144,13 +1237,14 @@ if __name__ == "__main__":
     fig7_width_scaling()
     fig8_h1_ablation_modadd()
     fig9_fourier_over_training()
-
     fig10_per_position_ablation()
+    fig11_attention_patterns()
 
     print("\n--- Appendix Figures ---")
     figa1_norm_comparison()
     figa2_topk()
     figa3_norm_ablation_add7()
     figa4_perseed_routing()
+    # Note: figa5 (attention patterns with norm) is generated inside fig11_attention_patterns()
 
     print("\nAll figures saved to figures/")

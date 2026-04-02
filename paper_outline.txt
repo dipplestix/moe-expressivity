@@ -1,0 +1,142 @@
+Paper Outline: How Mixture-of-Experts Changes Computation in Small Transformers
+================================================================================
+
+1. Introduction (~2 pages)
+--------------------------
+- Transformers' success, importance of understanding architectural choices
+- Mechanistic interpretability on algorithmic tasks (Nanda, Quirke) — but only dense architectures studied
+- MoE is increasingly common (Mixtral, Switch) but mechanistically understudied
+- Our guiding question: How does FFN architecture affect what attention learns?
+- Four variants (FFN, GLU, MoE, MoE-GLU), three tasks (modular addition, add-7, histogram)
+- Contributions:
+  1. MoE redistributes computation from FFN to attention
+  2. MoE accelerates grokking via regularization-routing interaction
+  3. GLU hides internal representations from activation probes
+  4. MoE-GLU experts partially specialize by operation type
+
+2. Background and Notation (~1.5 pages)
+----------------------------------------
+- 2.1 One-layer transformer: embedding, positional encoding, attention, FFN, output
+  - Math for attention: Q, K, V projections, softmax, multi-head
+- 2.2 FFN variants:
+  - FFN: W_down(activation(W_up(x)))
+  - GLU: W_down(activation(W_gate(x)) * W_up(x))
+  - MoE: router p(x) = softmax(W_r * x), top-k selection, dispatch to expert FFNs, aux loss
+  - MoE-GLU: same routing, GLU experts
+- 2.3 Parameter matching across variants (table of param counts)
+
+3. Experimental Setup (~1 page)
+--------------------------------
+- 3.1 Tasks:
+  - Modular addition: (a+b) mod 113, token format, 30/70 split, full-batch, 40k epochs
+  - Add-7: digit-by-digit x+7, reversed order, carry operations (+7/+1/+0), online batches, 10k steps
+  - Histogram: count token frequencies, T=32, L=10, backward sampling, 500 epochs
+- 3.2 Training: AdamW, hyperparameters per task (table)
+- 3.3 Evaluation: exact-match accuracy, multi-seed (5 seeds), error bars
+- 3.4 Analysis methods: component ablation (zero attention/FFN output), activation patching,
+  linear probes, routing MI, expert ablation, Fourier analysis
+
+4. Results (~8 pages)
+----------------------
+
+4.1 MoE Redistributes Computation from FFN to Attention (~2.5 pages)
+  - Component ablation on add-7 (no norm): FFN 9.5% without FFN, MoE 55% (Fig 4)
+  - Per-position analysis: MoE handles easy positions through attention, reserves experts
+    for hard positions (Fig 10)
+  - Same pattern on modular addition but weaker: MoE 16.5% vs FFN 1.5% without FFN (Fig 8)
+  - Tradeoff: MoE becomes attention-dependent — worse than FFN when attention is ablated
+  - Attention pattern analysis: MoE develops cleaner head specialization (digit-copying head,
+    self-attention head, context head) vs FFN's messier heads (Fig 11)
+  - Mechanistic explanation: routing bottleneck forces attention to develop structured circuits
+  - Activation patching confirms causal role: patching attention flips predictions more than
+    patching FFN across all variants (Fig 12). FFN has strongest attention-causal signal (0.59
+    at tens) because attention is its only cross-position path. MoE-GLU shows highest FFN
+    flip rate (0.62 at hundreds), consistent with expert specialization making FFN causally relevant.
+  - Histogram results (if they confirm the pattern)
+  - Connection to Glorot et al.: MoE shifts toward relation-based (attention) over
+    inventory-based (FFN) computation
+
+4.2 MoE Accelerates Grokking via Regularization-Routing Interaction (~2.5 pages)
+  - MoE groks 2-3x faster on modular addition, 5/5 seeds vs 3/5 (Fig 1)
+  - Regularization baselines: dropout=0.3 is even faster (2.1k vs 8.7k), so it's partly
+    regularization (Fig 2)
+  - E=1 control: has aux loss but doesn't help — routing to multiple experts matters (Fig 3)
+  - Top-k: top-2 kills grokking (0/5) — hard routing essential (Fig A2)
+  - Width scaling: advantage grows 1.1x to 2.7x from d=64 to d=256 (Fig 7)
+  - Sweet spot at E=2-4 experts, too many degrades
+
+4.3 GLU Hides Internal Structure from Probes (~1.5 pages)
+  - Fourier concentration: FFN 0.44, MoE 0.47, GLU 0.07, MoE-GLU 0.18 (Fig 6)
+  - Fourier structure over training: FFN neurons develop clean frequency responses,
+    GLU neurons don't (Fig 9)
+  - GLU doesn't improve task performance — same accuracy, just hides representations
+  - Explanation: gate and up projection split information, neither alone reveals the full picture
+  - Implication: activation-based interpretability may underestimate GLU models
+
+4.4 Expert Specialization by Operation Type (~1.5 pages)
+  - Routing MI: MoE-GLU 0.28 normalized, MoE 0.26 (add-7, no norm)
+  - Best case (MoE-GLU seed 42): expert 2 gets 100% of +7, expert 1 gets 92% of +1 (Fig 5)
+  - Expert ablation confirms differential impact by operation (Fig 5, right panel)
+  - Per-seed variability: specialization is consistent in direction but variable in degree (Fig A4)
+  - On modular addition: no specialization — all experts use same Fourier frequencies
+  - Specialization emerges on tasks with discrete operation types, not continuous structure
+
+5. Related Work (~1.5 pages)
+-----------------------------
+- Mechanistic interpretability of arithmetic: Nanda et al. (2023) on grokking and Fourier
+  circuits, Quirke & Barez (2024) on addition circuits and parallel digit streams,
+  Quirke et al. (2025) on carry/borrow circuits
+- Attention vs FFN interplay: Glorot et al. (2025) on counting — relation-based (attention)
+  vs inventory-based (FFN), Yuan et al. (2025) on random attention sufficiency
+- Mixture of Experts: Shazeer et al. (2017) original MoE, Fedus et al. (2022) Switch
+  Transformer, Jiang et al. (2024) Mixtral. MoE interpretability: "A Closer Look into MoE"
+  on expert specialization at scale, MONET on monosemantic experts
+- GLU and gated architectures: Dauphin et al. (2017) original GLU, Shazeer (2020) SwiGLU,
+  Heimersheim & Nanda on bilinear interpretability
+
+6. Discussion & Conclusion (~1 page)
+--------------------------------------
+- Summary of four findings
+- Limitations:
+  - 1-layer transformers on toy tasks — unclear if findings transfer to deeper models
+  - Add-7 with 3 digits is very easy — all variants solve it, differences only visible under ablation
+  - Expert specialization is seed-dependent
+  - Dropout baseline complicates the "MoE is special" narrative
+- Key takeaway: MoE doesn't just add parameters — it fundamentally changes how computation
+  distributes between attention and FFN. Practical implications for interpretability of
+  MoE-based LLMs.
+- Future work: Deeper models, harder tasks (more digits), theoretical analysis of why routing
+  acts as regularization, extending to larger-scale MoE models
+
+Appendices
+----------
+- A: Norm vs no-norm comparison (grokking timelines, ablation results)
+- B: Per-seed expert routing variability (all 5 seeds x 2 MoE variants)
+- C: Top-k routing results
+- D: Full hyperparameter tables for all experiments
+- E: GLU gate decomposition analysis (if we run it)
+
+Figure List
+-----------
+Main:
+  Fig 1:  Grokking timeline (modular addition, 5 seeds, shaded std)
+  Fig 2:  Regularization baselines (grokking speed + reliability)
+  Fig 3:  Number of experts scaling (E=1..16)
+  Fig 4:  H1 component ablation, add-7 (no norm)
+  Fig 5:  H3 expert-operation routing heatmap (MoE-GLU, seed 42)
+  Fig 6:  Neuron Fourier concentration histograms
+  Fig 7:  Model width scaling (d=64,128,256)
+  Fig 8:  H1 component ablation, modular addition (no norm)
+  Fig 9:  Fourier structure over training (seed 42)
+  Fig 10: Per-position accuracy under ablation (add-7, no norm)
+  Fig 11: Attention pattern heatmaps, all 4 variants per-head (add-7, no norm)
+  Fig 12: Activation patching flip rates by position and variant (add-7, no norm)
+
+Appendix:
+  Fig A1: Norm vs no-norm grokking comparison
+  Fig A2: Top-k routing (top-1 vs top-2 accuracy)
+  Fig A3: Norm effect on component ablation (add-7)
+  Fig A4: Per-seed expert routing variability
+  Fig A5: Attention pattern heatmaps, all 4 variants with norm (add-7)
+
+Estimated length: ~10 pages main + 5-10 pages appendix (ICML/NeurIPS format)
