@@ -466,6 +466,22 @@ Colors: FFN=blue, GLU=orange, MoE=green, MoE-GLU=red. All figures show all 4 var
 | Exact-match + digit-accuracy + per-token op accuracy | **Partial** | Exact-match done. Per-token op accuracy done via probes. Digit accuracy not reported separately. |
 | 95% CI over 5-10 seeds | **Done** | 5 seeds, mean ± std reported throughout |
 
+## What Would Make the Paper Ideal
+
+The core story: MoE's routing bottleneck forces attention to develop specialized circuits, adaptively shifting easy computations into attention while reserving expert capacity for hard operations. This is confirmed by ablation (55% vs 9.5%), DLA (64% vs 40% attention attribution), per-position analysis, carry-length stratification, attention patterns, and activation patching. Separately, MoE accelerates grokking through regularization that requires both routing and multiple experts.
+
+Three things would take the paper from "solid empirical observations" to "mechanistic understanding with causal evidence across multiple tasks":
+
+1. **GLU gate probes** — We show GLU hides structure (Fourier concentration 0.44→0.07) but never ran the gate probes that would explain *how*. That's the original H2 test. Without it, the GLU finding is an observation without a mechanism.
+
+2. **Histogram task (3rd task)** — Two tasks is suggestive, three is convincing. Set up and ready — just needs training and one ablation analysis to validate the redistribution finding.
+
+3. **Head-specific ablation** — Right now we show "MoE has cleaner heads" visually. If we could show "zeroing Head 2 in MoE destroys pass-through accuracy while zeroing Head 3 destroys carry accuracy," that's a much crisper mechanistic claim.
+
+Priority: histogram training (easiest, highest reviewer payoff) > head-specific ablation (strongest mechanistic claim) > GLU gate probes.
+
+---
+
 ## Pending Work (Priority Order)
 
 ### High Priority (needed for paper):
