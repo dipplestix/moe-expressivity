@@ -59,11 +59,21 @@ Each checkpoint directory contains:
 - `*_epoch{N}.pt` — Periodic saves
 - `*_test{50,90,99}.pt` — Milestone checkpoints (when test acc crosses thresholds)
 
+## Completion Status
+
+### Done:
+- All modular addition experiments (core + all controlled experiments)
+- All add-7 experiments (core + norm/no-norm)
+- Histogram core training (4 variants x 5 seeds, 1000 epochs)
+
+### Not yet run:
+- Histogram controlled experiments (regularization, num experts, width, top-k)
+
 ## Recommended Run Order
 
-1. Core multi-seed runs (all 3 tasks)
-2. Regularization baselines (exp 1)
-3. Number of experts (exp 2)
-4. Top-k routing (exp 5)
-5. Model width (exp 3)
-6. Norm ablations
+1. Core multi-seed runs (all 3 tasks) — **done**
+2. Regularization baselines (exp 1) — **done** (modadd), pending (histogram)
+3. Number of experts (exp 2) — **done** (modadd), pending (histogram)
+4. Top-k routing (exp 5) — **done** (modadd), pending (histogram)
+5. Model width (exp 3) — **done** (modadd), pending (histogram)
+6. Norm ablations — **done** (both tasks)

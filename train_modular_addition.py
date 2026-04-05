@@ -115,7 +115,7 @@ def train(args):
             if use_wandb:
                 wandb.log(log_dict)
 
-            # Milestone checkpoints
+            #Milestone checkpoints
             for pct, saved in milestones.items():
                 if not saved and test_acc > pct / 100.0:
                     path = ckpt_dir / f"modadd_test{pct}.pt"

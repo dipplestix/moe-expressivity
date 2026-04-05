@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 
 SEEDS="42 137 256 512 1024"
 FFN_TYPES="ffn glu moe moe_glu"
-EPOCHS=500
+EPOCHS=1000
 
 for seed in $SEEDS; do
     for ftype in $FFN_TYPES; do

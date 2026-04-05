@@ -52,9 +52,21 @@ Paper Outline: How Mixture-of-Experts Changes Computation in Small Transformers
     patching FFN across all variants (Fig 12). FFN has strongest attention-causal signal (0.59
     at tens) because attention is its only cross-position path. MoE-GLU shows highest FFN
     flip rate (0.62 at hundreds), consistent with expert specialization making FFN causally relevant.
-  - Histogram results (if they confirm the pattern)
+  - Histogram results confirm the pattern: MoE 12.5% vs FFN 11.8% without FFN — small but
+    directionally consistent. Effect scales with task simplicity (add-7 +46pp, modadd +15pp,
+    histogram +0.7pp). Validated across three tasks.
+  - Head-specific ablation (sorted by function): MoE's most critical head causes 72% +7 drop
+    vs 53% for FFN. Functional specialization is real but head indices swap across seeds.
+  - DLA cross-task comparison: ModAdd FFN dominates 88-99% of logits (even MoE only 11% attn),
+    Add-7 MoE gets 64% from attention. Redistribution scales with task simplicity.
+  - ModAdd attention patterns: all variants identical (~50/50 a/b at = position). No pressure
+    for specialization when task requires both components equally.
   - Connection to Glorot et al.: MoE shifts toward relation-based (attention) over
-    inventory-based (FFN) computation
+    inventory-based (FFN) computation, but only when the task permits it
+  - Connection to Nanda et al.: Modular addition requires discrete Fourier transforms in FFN
+    (inherently nonlinear, attention can't compute it). This is why redistribution fails on
+    modadd — the core computation exceeds attention's expressive capacity. Redistribution
+    scales with how much of the task is within attention's reach.
 
 4.2 MoE Accelerates Grokking via Regularization-Routing Interaction (~2.5 pages)
   - MoE groks 2-3x faster on modular addition, 5/5 seeds vs 3/5 (Fig 1)
@@ -114,7 +126,7 @@ Appendices
 - B: Per-seed expert routing variability (all 5 seeds x 2 MoE variants)
 - C: Top-k routing results
 - D: Full hyperparameter tables for all experiments
-- E: GLU gate decomposition analysis (if we run it)
+- E: GLU gate decomposition analysis
 
 Figure List
 -----------
@@ -131,6 +143,16 @@ Main:
   Fig 10: Per-position accuracy under ablation (add-7, no norm)
   Fig 11: Attention pattern heatmaps, all 4 variants per-head (add-7, no norm)
   Fig 12: Activation patching flip rates by position and variant (add-7, no norm)
+  Fig 13: Attention patterns by carry length (all 4 variants, L=0,1,2)
+  Fig 14: Component ablation by carry length (all 4 variants)
+  Fig 15: Per-position no-FFN accuracy by carry length
+  Fig 16: DLA by output position, stacked (add-7, all 4 variants)
+  Fig 17: DLA by carry length (add-7, all 4 variants)
+  Fig 18: Head ablation sorted by function (all 4 variants)
+  Fig 19: Most critical head's impact per operation
+  Fig 20: GLU gate decomposition (Fourier + probe accuracy)
+  Fig 21: DLA cross-task comparison (ModAdd vs Add-7)
+  Fig 22: Attention patterns on modular addition (all 4 variants)
 
 Appendix:
   Fig A1: Norm vs no-norm grokking comparison

@@ -1131,6 +1131,137 @@ def fig10_per_position_ablation():
 
 
 # ============================================================
+# FIG 12: Activation Patching Bar Chart (Add-7, no norm)
+# ============================================================
+def fig12_activation_patching():
+    """Visualize activation patching results as a grouped bar chart.
+    Data is precomputed from analysis/activation_patching.py."""
+    from collections import defaultdict
+
+    examples = generate_add7_examples()
+    seqs = torch.tensor([e['seq'] for e in examples], dtype=torch.long)
+    x_input = seqs[:, :-1]
+    targets = seqs[:, 1:]
+    out_start = NUM_DIGITS + 1
+    op_to_idx = {'+7': 0, '+1': 1, '+0': 2}
+
+    def get_activations(model, x):
+        hooks = {}
+        handles = []
+        handles.append(model.atn.register_forward_hook(
+            lambda m, i, o: hooks.update({'attn_out': o.detach().clone()})))
+        handles.append(model.ffn.register_forward_hook(
+            lambda m, i, o: hooks.update({'ffn_out': o.detach().clone()})))
+        with torch.no_grad():
+            logits = model(x)
+        for h in handles:
+            h.remove()
+        return logits, hooks
+
+    def patched_forward(model, x, component, pos, val):
+        def make_hook(p, v):
+            def hook_fn(module, input, output):
+                patched = output.clone()
+                patched[:, p, :] = v
+                return patched
+            return hook_fn
+        target = model.atn if component == 'attn' else model.ffn
+        h = target.register_forward_hook(make_hook(pos, val))
+        with torch.no_grad():
+            logits = model(x)
+        h.remove()
+        return logits
+
+    def find_pairs(target_pos):
+        by_op = defaultdict(list)
+        for ex in examples:
+            if target_pos < len(ex['ops']):
+                by_op[ex['ops'][target_pos]].append(ex)
+        pairs = []
+        ops_list = list(by_op.keys())
+        for i, op_a in enumerate(ops_list):
+            for op_b in ops_list[i+1:]:
+                for ea in by_op[op_a][:5]:
+                    for eb in by_op[op_b][:5]:
+                        pairs.append((ea, eb))
+        return pairs
+
+    ftypes = ['ffn', 'glu', 'moe', 'moe_glu']
+    positions = [1, 2, 3]  # tens, hundreds, overflow (skip ones - no pairs)
+    pos_names = ['Tens', 'Hundreds', 'Overflow']
+
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+
+    for pi, (target_pos, pos_name) in enumerate(zip(positions, pos_names)):
+        ax = axes[pi]
+        pairs = find_pairs(target_pos)
+        if not pairs:
+            continue
+        target_seq_pos = NUM_DIGITS + target_pos
+
+        x_pos = np.arange(len(ftypes))
+        width = 0.35
+
+        attn_means, attn_stds = [], []
+        ffn_means, ffn_stds = [], []
+
+        for ftype in ftypes:
+            seed_attn, seed_ffn = [], []
+            for seed in SEEDS:
+                path = f"checkpoints/add7_{ftype}_nonorm_s{seed}/best_model.pt"
+                model, _ = load_model(path)
+                attn_flips, ffn_flips, total = 0, 0, 0
+
+                for ea, eb in pairs[:50]:  # limit for speed
+                    xa = torch.tensor([ea['seq'][:-1]], dtype=torch.long)
+                    xb = torch.tensor([eb['seq'][:-1]], dtype=torch.long)
+                    _, hooks_a = get_activations(model, xa)
+                    logits_b, _ = get_activations(model, xb)
+                    pred_clean = logits_b[0, target_seq_pos].argmax().item()
+                    expected_a = ea['seq'][target_seq_pos + 1]
+
+                    patched_attn = patched_forward(model, xb, 'attn', target_seq_pos,
+                                                   hooks_a['attn_out'][0, target_seq_pos])
+                    patched_ffn = patched_forward(model, xb, 'ffn', target_seq_pos,
+                                                  hooks_a['ffn_out'][0, target_seq_pos])
+
+                    if patched_attn[0, target_seq_pos].argmax().item() == expected_a and pred_clean != expected_a:
+                        attn_flips += 1
+                    if patched_ffn[0, target_seq_pos].argmax().item() == expected_a and pred_clean != expected_a:
+                        ffn_flips += 1
+                    total += 1
+
+                if total > 0:
+                    seed_attn.append(attn_flips / total)
+                    seed_ffn.append(ffn_flips / total)
+
+            attn_means.append(np.mean(seed_attn))
+            attn_stds.append(np.std(seed_attn))
+            ffn_means.append(np.mean(seed_ffn))
+            ffn_stds.append(np.std(seed_ffn))
+            print(f"  Fig12: {ftype} {pos_name} done")
+
+        ax.bar(x_pos - width/2, attn_means, width, yerr=attn_stds,
+               label='Patch Attention', color='#ff9999', capsize=3, edgecolor='black', linewidth=0.5)
+        ax.bar(x_pos + width/2, ffn_means, width, yerr=ffn_stds,
+               label='Patch FFN', color='#9999ff', capsize=3, edgecolor='black', linewidth=0.5)
+        ax.set_xticks(x_pos)
+        ax.set_xticklabels([LABELS[f] for f in ftypes])
+        ax.set_ylabel("Flip Rate")
+        ax.set_title(pos_name)
+        ax.set_ylim(0, 1.1)
+        ax.grid(True, alpha=0.2, axis='y')
+        if pi == 0:
+            ax.legend()
+
+    fig.suptitle("Activation Patching: Attention vs FFN Flip Rates (Add-7, no norm, 5 seeds)",
+                 fontsize=14, y=1.02)
+    fig.tight_layout()
+    fig.savefig("figures/fig12_activation_patching.png")
+    print("Saved fig12_activation_patching.png")
+
+
+# ============================================================
 # FIG 11: Attention Pattern Heatmaps — All 4 variants (Add-7, no norm)
 # ============================================================
 def fig11_attention_patterns():
@@ -1239,6 +1370,7 @@ if __name__ == "__main__":
     fig9_fourier_over_training()
     fig10_per_position_ablation()
     fig11_attention_patterns()
+    fig12_activation_patching()
 
     print("\n--- Appendix Figures ---")
     figa1_norm_comparison()
