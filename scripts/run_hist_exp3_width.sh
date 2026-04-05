@@ -3,7 +3,7 @@
 cd "$(dirname "$0")/.."
 
 SEEDS="42 137 256 512 1024"
-EPOCHS=500
+EPOCHS=1000
 WIDTHS="48 64 256"  # 128 is already done in baseline runs
 
 echo "=== Histogram Exp 3: Vary Model Width ==="

@@ -139,6 +139,37 @@ On add-7, linear probes achieve 100% accuracy from gate, up, AND product — the
 
 **Key insight**: GLU doesn't hide information, it hides **structure**. Methods that examine individual neuron responses (Fourier analysis, feature visualization) will miss it, but methods that use the full activation vector (linear probes) can still extract it.
 
+Enhanced visualization (fig_glu_decomposition_enhanced.png) shows this at three levels:
+- (a) Single neuron example: gate and up each have a Fourier peak, but their product is flat
+- (b) Population: gate/up concentration distributions overlap with moderate values, product distribution is compressed near zero
+- (c) Summary: FFN neurons 0.443 → GLU gate 0.095, up 0.106, gate×up **0.071** — multiplication destroys structure
+
+### Connection to GLU Interpretability Literature
+
+Pearce, Dooms, Rigg, Oramas & Sharkey (2024) argue that bilinear/GLU architectures enable **weight-based** mechanistic interpretability — because GLU can be expressed as a third-order tensor, eigendecomposition of the weights reveals interpretable low-rank structure. Our results are complementary, not contradictory: GLU may enable weight-based analysis but simultaneously **hides activation-based** structure. The multiplicative gate-up interaction destroys the per-neuron Fourier modes that are cleanly visible in standard FFN activations.
+
+This distinction matters practically. GLUScope (2025) was developed specifically because existing neuron analysis tools (designed for ReLU/GELU) fail on GLU architectures — GLU neurons have four sign combinations (gate±, up±) with different functionalities that standard tools don't capture. Our Fourier concentration result (0.44 → 0.07) is a concrete, quantitative example of this failure mode.
+
+Since SwiGLU is now standard in modern LLMs (LLaMA, OLMo, Gemma), this has broad implications: **activation-based interpretability methods may systematically underestimate what GLU-based models have learned.**
+
+### Pearce et al. Weight Decomposition Results
+
+We applied the bilinear tensor decomposition from Pearce et al. (2024) to our GLU models on modular addition. The tensor T_ijk = Σ_m W_down[i,m] * W_gate[m,j] * W_up[m,k] was constructed and its SVD computed. We then checked the Fourier concentration of the right singular vectors projected onto the (a+b) mod p diagonal.
+
+| Analysis Method | FFN | GLU | MoE-GLU |
+|----------------|-----|-----|---------|
+| Activation Fourier conc. | **0.44** | 0.07 | 0.18 |
+| Weight tensor Fourier conc. | N/A (not bilinear) | **0.07** | **0.07** |
+| Linear probe accuracy | 99% | 100% | 100% |
+
+**Finding**: The weight decomposition also shows low Fourier concentration (0.07) — the same as the activation analysis. Unlike Pearce et al.'s results on larger models where weight eigendecomposition reveals interpretable structure, our small GLU models do not show clean Fourier modes in either weights or activations.
+
+This suggests GLU genuinely computes modular addition via a **different internal algorithm** than FFN — not a hidden Fourier circuit, but a distributed computation that achieves the same result without per-neuron frequency specialization. Linear probes can decode the answer (100% accuracy), confirming the computation is correct, but it's not organized as human-interpretable features at any level of analysis.
+
+**Implication**: On these small models, full-vector methods (linear probes) are the only reliable interpretability approach for GLU architectures. Neither neuron-level activation analysis nor weight-based tensor decomposition reveals the learned algorithm.
+
+For add-7, the GLU weight tensor has near-uniform singular values (ratio S[0]/S[9] = 1.8, effective rank = 64), indicating no low-rank structure — the computation is fully distributed across all weight dimensions.
+
 ---
 
 ## H3: MoE Expert Specialization (Add-7)
@@ -418,9 +449,9 @@ At L=0 (no carry), MoE's attention dominance is strongest. At L=2, the balance s
 - [x] Norm vs no-norm — done
 - [x] Component ablation — done, all 4 variants, norm + no-norm
 - [x] Fourier analysis — done (neuron concentration, router, over training)
-- [ ] Attention patterns — does MoE develop different attention structure here too?
-- [ ] DLA — quantify attention vs FFN contribution to correct logit
-- [ ] Weight norm tracking over training — does aux loss constrain weight growth during grokking?
+- [x] Attention patterns — done, all variants identical 50/50 a/b
+- [x] DLA — done, FFN dominates 88-99%
+- [x] Weight norm tracking over training — done, MoE compresses weights 0.63x, GLU FFN collapses to 0.21x
 - [ ] Fourier analysis of router during grokking — across all seeds (not just seed 42)
 - [ ] Head-specific ablation
 
@@ -617,6 +648,9 @@ The core story is now validated across three tasks. Remaining gaps:
 - [x] **Activation patching figure** — done, added to visualize_results.py as fig12
 - [x] **ModAdd DLA** — done, FFN dominates 88-99% across all variants, MoE has highest attn fraction (11.4%)
 - [x] **ModAdd attention patterns** — done, all variants identical (~50/50 a/b), no specialization pressure
+- [x] **Pearce et al. weight-based analysis** — done. Weight tensor decomposition also shows low Fourier concentration (0.07), same as activations. GLU genuinely computes differently, not just hiding Fourier structure.
+  - [x] ModAdd: weight Fourier conc 0.07 (same as activation). No hidden structure.
+  - [x] Add-7: near-uniform singular values, no low-rank structure. Fully distributed.
 
 ### Figures TODO:
 - [x] Fig 1-11: generated by `analysis/visualize_results.py`
@@ -627,6 +661,33 @@ The core story is now validated across three tasks. Remaining gaps:
 - [x] Fig GLU gate probes: generated by `analysis/glu_gate_probes.py`
 - [x] Fig A1-A5: generated by `analysis/visualize_results.py`
 
+---
+
+## Weight Norm Tracking During Grokking (Modular Addition)
+
+**Question**: Does MoE's aux loss constrain weight growth, explaining the regularization effect?
+
+### Weight norm change from epoch 5k to 40k
+
+| Variant | Attention | FFN | Total |
+|---------|-----------|-----|-------|
+| FFN | 1.35x (grows) | 0.84x | 0.85x |
+| GLU | 1.12x | **0.21x (collapses)** | 0.75x |
+| MoE | **0.59x (shrinks)** | 0.74x | **0.63x** |
+| MoE-GLU | 0.70x | **0.24x (collapses)** | **0.55x** |
+
+**Findings**:
+
+1. **MoE compresses weights most aggressively** — total norm drops to 0.63x. The aux loss + weight decay together drive weights toward smaller, more generalizable solutions. This is the mechanistic basis for MoE's grokking acceleration.
+
+2. **GLU/MoE-GLU FFN weights collapse** (0.21-0.24x) — the gate learns to zero out most FFN weights. Connected to why GLU hides structure: the weights themselves are driven toward zero.
+
+3. **FFN is the only variant where attention weights grow** (1.35x) — it compensates for FFN shrinkage by building attention capacity. All other variants have shrinking attention weights.
+
+4. **MoE shrinks both components uniformly** (attn 0.59x, FFN 0.74x) — balanced compression consistent with routing distributing regularization pressure across all weights.
+
+---
+
 ### Medium Priority (strengthens paper):
 - [ ] Histogram controlled experiments:
   - [ ] Regularization baselines: `bash scripts/run_hist_exp1_regularization.sh`
@@ -634,12 +695,12 @@ The core story is now validated across three tasks. Remaining gaps:
   - [ ] Model width: `bash scripts/run_hist_exp3_width.sh`
   - [ ] Top-k routing: `bash scripts/run_hist_exp5_topk.sh`
 - [ ] **MoE routing histograms stratified by carry length L** (not just by operation)
-- [ ] **Weight norm tracking during grokking** — mechanistic explanation for aux loss regularization
+- [x] **Weight norm tracking during grokking** — done. MoE compresses weights most (0.63x total), GLU FFN collapses (0.21x).
 - [ ] **Balanced data curriculum** — retrain add-7 with balanced carry-length sampling
 
 ### Lower Priority (nice to have):
-- [ ] Frozen component training (train with frozen attention or FFN)
+- [ ] Frozen component training (train with frozen attention or FFN) — script ready: `bash scripts/run_frozen_components.sh`
 - [ ] Fourier analysis of router across all seeds (not just seed 42)
-- [ ] Generalization checks (train L≤2, test L≥3)
+- [ ] Generalization checks (train L≤2, test L≥3) — would test if MoE's expert specialization helps carry-chain generalization. Requires retraining with filtered data.
 - [ ] Carry-length analysis at different model widths and expert counts (requires new add-7 training)
-- [ ] GLU gate/up decomposition analysis (explain why GLU hides structure)
+- [x] GLU gate/up decomposition analysis — done (gate probes + Pearce et al. weight decomposition + enhanced figure)

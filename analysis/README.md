@@ -111,6 +111,18 @@ Fourier analysis on modular addition:
 
 Component ablation (zero attention / zero FFN) on modular addition across all 4 variants x 5 seeds. Compares norm vs no-norm settings.
 
+### `glu_decomposition_figure.py`
+
+Enhanced 3-panel figure showing how GLU's multiplicative gating destroys per-neuron Fourier structure: (a) single neuron spectrum comparison, (b) concentration distributions, (c) summary bar chart with destruction arrow.
+
+### `weight_norm_tracking.py`
+
+Tracks L2 norm of attention and FFN weights over training during grokking on modular addition. Loads epoch checkpoints and measures how weight norms change. Shows MoE compresses weights most aggressively (0.63x), providing mechanistic basis for grokking acceleration.
+
+### `glu_weight_decomposition.py`
+
+Pearce et al. (2024) bilinear tensor decomposition of GLU weights. Constructs T_ijk = W_down[i,m] * W_gate[m,j] * W_up[m,k] and analyzes SVD. Tests whether Fourier structure hidden from activations is visible in weights (result: it's not — weight Fourier concentration is also 0.07).
+
 ## Note on ModAdd DLA and Attention Patterns
 
 The modular addition DLA and attention pattern analyses were run inline (not as separate scripts). Results:

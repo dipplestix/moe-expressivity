@@ -3,7 +3,7 @@
 cd "$(dirname "$0")/.."
 
 SEEDS="42 137 256 512 1024"
-EPOCHS=500
+EPOCHS=1000
 EXPERT_COUNTS="1 2 4 8 16"
 
 echo "=== Histogram Exp 2: Vary Number of Experts ==="

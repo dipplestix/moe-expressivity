@@ -68,6 +68,7 @@ Each checkpoint directory contains:
 
 ### Not yet run:
 - Histogram controlled experiments (regularization, num experts, width, top-k)
+- Frozen component training (`run_frozen_components.sh`) — 4 variants x 5 seeds x 2 freeze conditions
 
 ## Recommended Run Order
 

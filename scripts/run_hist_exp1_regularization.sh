@@ -4,7 +4,7 @@
 cd "$(dirname "$0")/.."
 
 SEEDS="42 137 256 512 1024"
-EPOCHS=500
+EPOCHS=1000
 
 echo "=== Histogram Exp 1: Regularization Baselines ==="
 echo

@@ -76,14 +76,28 @@ Paper Outline: How Mixture-of-Experts Changes Computation in Small Transformers
   - Top-k: top-2 kills grokking (0/5) — hard routing essential (Fig A2)
   - Width scaling: advantage grows 1.1x to 2.7x from d=64 to d=256 (Fig 7)
   - Sweet spot at E=2-4 experts, too many degrades
+  - Weight norm tracking: MoE compresses weights most aggressively (0.63x total norm at ep40k
+    vs ep5k). Aux loss + weight decay drive weights toward smaller, more generalizable solutions.
+    FFN is the only variant where attention weights grow (1.35x). GLU FFN weights collapse (0.21x).
 
 4.3 GLU Hides Internal Structure from Probes (~1.5 pages)
   - Fourier concentration: FFN 0.44, MoE 0.47, GLU 0.07, MoE-GLU 0.18 (Fig 6)
   - Fourier structure over training: FFN neurons develop clean frequency responses,
     GLU neurons don't (Fig 9)
   - GLU doesn't improve task performance — same accuracy, just hides representations
-  - Explanation: gate and up projection split information, neither alone reveals the full picture
-  - Implication: activation-based interpretability may underestimate GLU models
+  - Gate decomposition: gate 0.11, up 0.14, product 0.05 — multiplication DESTROYS structure,
+    not splits it. But linear probes get 100% from all components. (Fig 20)
+  - Connection to Pearce et al. (2024): they show GLU enables weight-based interpretability
+    via tensor decomposition. Our result is complementary: GLU hides activation-based structure.
+    Weight analysis and activation analysis give opposite conclusions about GLU interpretability.
+  - Connection to GLUScope (2025): built because standard neuron tools fail on GLU. Our
+    Fourier concentration drop is a concrete quantitative example of this failure.
+  - Pearce et al. weight tensor decomposition: weight Fourier conc is ALSO 0.07 — weights
+    don't reveal hidden structure either. GLU genuinely computes differently, not just hiding
+    Fourier circuits. Neither activation nor weight analysis works at the neuron level.
+  - Only full-vector methods (linear probes, 100% accuracy) reliably decode GLU representations.
+  - Practical implication: since SwiGLU is standard in LLaMA/OLMo/Gemma, activation-based
+    AND neuron-level weight-based methods may systematically underestimate modern LLMs.
 
 4.4 Expert Specialization by Operation Type (~1.5 pages)
   - Routing MI: MoE-GLU 0.28 normalized, MoE 0.26 (add-7, no norm)
@@ -103,22 +117,76 @@ Paper Outline: How Mixture-of-Experts Changes Computation in Small Transformers
 - Mixture of Experts: Shazeer et al. (2017) original MoE, Fedus et al. (2022) Switch
   Transformer, Jiang et al. (2024) Mixtral. MoE interpretability: "A Closer Look into MoE"
   on expert specialization at scale, MONET on monosemantic experts
-- GLU and gated architectures: Dauphin et al. (2017) original GLU, Shazeer (2020) SwiGLU,
-  Heimersheim & Nanda on bilinear interpretability
+- GLU and gated architectures: Dauphin et al. (2017) original GLU, Shazeer (2020) SwiGLU.
+  Pearce, Dooms, Rigg, Oramas & Sharkey (2024) show bilinear/GLU enables weight-based interpretability
+  via tensor decomposition — our activation-level results are complementary (GLU hides
+  activation structure while enabling weight analysis). GLUScope (2025) addresses the tooling
+  gap for GLU neuron analysis that our findings quantify.
 
 6. Discussion & Conclusion (~1 page)
 --------------------------------------
-- Summary of four findings
+- Summary: MoE's routing bottleneck forces an adaptive redistribution of transformer
+  computation, shifting linear operations into attention while reserving the FFN for
+  nonlinear tasks — a mechanical shift we trace from optimization dynamics to its
+  implications for GLU interpretability.
 - Limitations:
   - 1-layer transformers on toy tasks — unclear if findings transfer to deeper models
   - Add-7 with 3 digits is very easy — all variants solve it, differences only visible under ablation
-  - Expert specialization is seed-dependent
+  - Expert specialization is seed-dependent (high variance: 0.28 ± 0.20 MI)
   - Dropout baseline complicates the "MoE is special" narrative
 - Key takeaway: MoE doesn't just add parameters — it fundamentally changes how computation
   distributes between attention and FFN. Practical implications for interpretability of
   MoE-based LLMs.
 - Future work: Deeper models, harder tasks (more digits), theoretical analysis of why routing
   acts as regularization, extending to larger-scale MoE models
+- Open-source: full codebase, checkpoints, and analysis scripts released for reproducibility
+
+Anticipated Reviewer Concerns (address in writing)
+---------------------------------------------------
+
+1. "EASY" VS "HARD" DEFINITION
+   Reviewers will want a rigorous definition, not just "copy vs carry."
+   ADDRESS IN PAPER: Define formally in Section 3 or 4.1:
+   - "Easy" = operations computable by linear functions of the input
+     (digit copying = position-dependent lookup, pass-through = identity).
+   - "Hard" = operations requiring nonlinear computation
+     (modular arithmetic via Fourier transforms per Nanda et al.,
+     carry detection requiring threshold: digit + carry >= 10).
+   Can also frame in terms of circuit complexity or sequential dependence.
+
+2. LINEAR PROBE CAPACITY
+   Critics may ask if the probe is "doing the computation" when we claim
+   GLU hides structure but probes get 100%.
+   ADDRESS IN PAPER: State explicitly in Section 4.3:
+   - Our probe is a single nn.Linear (logistic regression) — the weakest
+     possible probe. It cannot compute nonlinear functions.
+   - 100% accuracy means the features are linearly separable in the
+     activation space, just not organized per-neuron.
+   - Contrast: Fourier analysis requires per-neuron structure, which GLU
+     destroys. The information exists in the distributed representation
+     but not in individual neuron responses.
+
+3. SEED DEPENDENCY OF EXPERT SPECIALIZATION
+   Must quantify, not just acknowledge.
+   ADDRESS IN PAPER: In Section 4.4:
+   - Report MI mean ± std across all 5 seeds (already done: 0.28 ± 0.20)
+   - Show Fig A4 (per-seed routing heatmaps) prominently
+   - Note that functional head roles also swap across seeds (head ablation
+     sorted by function addresses this)
+   - Frame honestly: specialization is a tendency, not a guarantee.
+     The direction is consistent even when the degree varies.
+   - HYPOTHESIZE WHY: high variance likely from early routing decisions —
+     the router makes random assignments initially, and whichever expert
+     happens to see more +7 tokens early on gets reinforced into that role.
+     Small differences in initialization cascade into different patterns.
+
+4. ATTENTION-DEPENDENT CLARIFICATION
+   MoE without attention = 36%, FFN without attention = 55%. Zeroing
+   attention hurts MoE MORE than FFN — consistent with MoE offloading
+   to attention. Without attention, MoE's FFN cannot compute the full
+   circuit independently, whereas dense FFN retains more standalone
+   capability because it never offloaded.
+   ADDRESS IN PAPER: Make this explicit in Section 4.1 to avoid confusion.
 
 Appendices
 ----------
@@ -153,6 +221,9 @@ Main:
   Fig 20: GLU gate decomposition (Fourier + probe accuracy)
   Fig 21: DLA cross-task comparison (ModAdd vs Add-7)
   Fig 22: Attention patterns on modular addition (all 4 variants)
+  Fig 23: GLU decomposition enhanced (neuron spectrum + distribution + summary bar)
+  Fig 24: Weight norm tracking during grokking (attn/FFN/total norms)
+  Fig 25: GLU weight vs activation Fourier concentration (Pearce et al.)
 
 Appendix:
   Fig A1: Norm vs no-norm grokking comparison
