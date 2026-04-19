@@ -56,6 +56,7 @@ def train(args):
         intermediate_dim=args.intermediate_dim,
         num_experts=args.num_experts,
         top_k=args.top_k,
+        random_routing=args.random_routing,
     ).to(device)
 
     n_params = sum(p.numel() for p in model.parameters())
@@ -177,6 +178,8 @@ if __name__ == "__main__":
     parser.add_argument("--dropout", type=float, default=0.0)
     parser.add_argument("--num_experts", type=int, default=4)
     parser.add_argument("--top_k", type=int, default=1)
+    parser.add_argument("--random_routing", action="store_true", default=False,
+                        help="Freeze router weights at init (random routing control)")
 
     # Training
     parser.add_argument("--lr", type=float, default=1e-3)

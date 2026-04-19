@@ -118,13 +118,16 @@ class MHA(nn.Module):
 class MoE(nn.Module):
     """Mixture of Experts layer with Switch-style top-k routing."""
 
-    def __init__(self, input_dim, intermediate_dim, output_dim, num_experts=4, top_k=1, activation=nn.SiLU):
+    def __init__(self, input_dim, intermediate_dim, output_dim, num_experts=4, top_k=1, activation=nn.SiLU, random_routing=False):
         super().__init__()
         self.input_dim = input_dim
         self.num_experts = num_experts
         self.top_k = top_k
+        self.random_routing = random_routing
 
         self.router = nn.Linear(input_dim, num_experts, bias=False)
+        if random_routing:
+            self.router.weight.requires_grad = False
 
         expert_intermediate = intermediate_dim // num_experts
         self.experts = nn.ModuleList([
@@ -143,11 +146,9 @@ class MoE(nn.Module):
         router_probs = F.softmax(router_logits, dim=-1)  # (B*T, E)
 
         topk_weights, topk_indices = torch.topk(router_probs, self.top_k, dim=-1)  # (B*T, k)
-        #check need to normalize?
         topk_weights = topk_weights / topk_weights.sum(dim=-1, keepdim=True)  # renormalize
 
         # Load-balancing loss: E * sum(f_i * P_i)
-        # f_i = fraction of tokens routed to expert i
         one_hot = F.one_hot(topk_indices, self.num_experts).float()  # (B*T, k, E)
         tokens_per_expert = one_hot.sum(dim=1).mean(dim=0)  # (E,) fraction routed
         prob_per_expert = router_probs.mean(dim=0)  # (E,) mean probability
@@ -166,13 +167,16 @@ class MoE(nn.Module):
 
 class MoEGLU(nn.Module):
     "MoE-glu"
-    def __init__(self, input_dim, intermediate_dim, output_dim, num_experts=4, top_k=1, activation=nn.SiLU):
+    def __init__(self, input_dim, intermediate_dim, output_dim, num_experts=4, top_k=1, activation=nn.SiLU, random_routing=False):
         super().__init__()
         self.input_dim = input_dim
         self.num_experts = num_experts
         self.top_k = top_k
+        self.random_routing = random_routing
 
         self.router = nn.Linear(input_dim, num_experts, bias=False)
+        if random_routing:
+            self.router.weight.requires_grad = False
 
         expert_intermediate = intermediate_dim // num_experts
         self.experts = nn.ModuleList([
@@ -191,11 +195,9 @@ class MoEGLU(nn.Module):
         router_probs = F.softmax(router_logits, dim=-1)  # (B*T, E)
 
         topk_weights, topk_indices = torch.topk(router_probs, self.top_k, dim=-1)  # (B*T, k)
-        #check need to normalize?
         topk_weights = topk_weights / topk_weights.sum(dim=-1, keepdim=True)  # renormalize
 
         # Load-balancing loss: E * sum(f_i * P_i)
-        # f_i = fraction of tokens routed to expert i
         one_hot = F.one_hot(topk_indices, self.num_experts).float()  # (B*T, k, E)
         tokens_per_expert = one_hot.sum(dim=1).mean(dim=0)  # (E,) fraction routed
         prob_per_expert = router_probs.mean(dim=0)  # (E,) mean probability

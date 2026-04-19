@@ -10,7 +10,8 @@ dependencies = [
     "marimo>=0.18.4",
     "matplotlib>=3.10.8",
     "pyarrow<19",
-    "torch>=2.9.1,<2.10",
+    "scikit-learn>=1.8.0",
+    "torch==2.8.0",
     "transformer-lens>=2.16.1",
     "wandb>=0.23.1",
 ]

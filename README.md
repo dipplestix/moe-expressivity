@@ -6,7 +6,7 @@ Investigating how replacing dense FFN with Mixture of Experts changes the comput
 
 **How does the choice of FFN architecture affect what the attention mechanism learns?**
 
-We compare four architectures (matched for parameter count): standard FFN, GLU, MoE (FFN experts), and MoE-GLU. Inspired by Glorot et al. (2025) which studies the interplay between attention and FFN on counting tasks.
+We compare four architectures (matched for parameter count): standard FFN, GLU, MoE (FFN experts), and MoE-GLU. Inspired by Behrens et al. (2025) which studies the interplay between attention and FFN on counting tasks.
 
 ### Sub-questions
 
@@ -21,7 +21,7 @@ We compare four architectures (matched for parameter count): standard FFN, GLU, 
 |------|-------------|---------------|
 | **Modular Addition** | (a+b) mod 113, Nanda et al. (2023) | Grokking dynamics, Fourier analysis |
 | **Add-7** | Digit-by-digit x+7 with carry propagation | Computation structure, expert specialization |
-| **Histogram** | Count token frequencies, Glorot et al. (2025) | Validation of redistribution finding |
+| **Histogram** | Count token frequencies, Behrens et al. (2025) | Validation of redistribution finding |
 
 ## Architecture Variants
 
@@ -106,5 +106,5 @@ See `results_all_experiments.md` for full details.
 
 - Nanda et al. (2023) "Progress measures for grokking via mechanistic interpretability"
 - Quirke & Barez (2024) "Understanding Addition in Transformers"
-- Glorot et al. (2025) "Counting in Small Transformers: The Delicate Interplay between Attention and Feed-Forward Layers"
+- Behrens et al. (2025) "Counting in Small Transformers: The Delicate Interplay between Attention and Feed-Forward Layers"
 - Yuan et al. (2025) "Is Random Attention Sufficient for Sequence Modeling?"

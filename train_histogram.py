@@ -1,6 +1,6 @@
 
 """
-Training script for histogram counting task (Glorot et al. 2025) 
+Training script for histogram counting task (Behrens et al. 2025) 
 Key differences from modular addition:
 - Loss at every position (not just position 2)
 - online data: fresh batch each epoch (not full-batch)  
@@ -54,8 +54,9 @@ def train(args):
       tie_embeddings=False,               # output classes ≠ input vocab                                                                       
       activation=args.activation,                                                                                                              
       intermediate_dim=args.intermediate_dim,                                                                                                  
-      num_experts=args.num_experts,                                                                                                            
+      num_experts=args.num_experts,
       top_k=args.top_k,
+      random_routing=args.random_routing,
     ).to(device)
 
     # Replace output head: model outputs T logits but we need L classes (counts)
@@ -187,6 +188,8 @@ if __name__ == "__main__":
     parser.add_argument("--dropout", type=float, default=0.0)
     parser.add_argument("--num_experts", type=int, default=4)
     parser.add_argument("--top_k", type=int, default=1)
+    parser.add_argument("--random_routing", action="store_true", default=False,
+                        help="Freeze router weights at init (random routing control)")
 
     # Training
     parser.add_argument("--lr", type=float, default=1e-3)

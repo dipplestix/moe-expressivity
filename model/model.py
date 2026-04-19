@@ -20,6 +20,7 @@ class OneLayerTransformer(nn.Module):
     intermediate_dim=None,
     num_experts=4,
     top_k=1,
+    random_routing=False,
     ):
         super().__init__()
         self.model_dim = model_dim
@@ -51,11 +52,11 @@ class OneLayerTransformer(nn.Module):
         elif ffn_type == "moe":
             idim = intermediate_dim if intermediate_dim is not None else model_dim * 4
             self.ffn = MoE(input_dim=model_dim, intermediate_dim=idim, output_dim=model_dim,
-                           num_experts=num_experts, top_k=top_k, activation=act_cls)
+                           num_experts=num_experts, top_k=top_k, activation=act_cls, random_routing=random_routing)
         elif ffn_type == "moe_glu":
             idim = intermediate_dim if intermediate_dim is not None else model_dim * 4
             self.ffn = MoEGLU(input_dim=model_dim, intermediate_dim=idim, output_dim=model_dim,
-                           num_experts=num_experts, top_k=top_k, activation=act_cls)
+                           num_experts=num_experts, top_k=top_k, activation=act_cls, random_routing=random_routing)
         else:
             raise ValueError(f"Invalid FFN type: {ffn_type}")
 

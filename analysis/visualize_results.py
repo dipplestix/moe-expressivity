@@ -468,7 +468,7 @@ def fig5_h3_routing():
     seqs = torch.tensor([e['seq'] for e in examples], dtype=torch.long)
     x_input = seqs[:, :-1]
     targets = seqs[:, 1:]
-    out_start = NUM_DIGITS + 1
+    out_start = NUM_DIGITS  # pos in x_input that predicts output digit 0
     ops = ['+7', '+1', '+0']
     op_to_idx = {'+7': 0, '+1': 1, '+0': 2}
 
@@ -492,7 +492,7 @@ def fig5_h3_routing():
     routing_counts = np.zeros((3, ne))
     for i, ex in enumerate(examples):
         for t, op in enumerate(ex['ops']):
-            pos = NUM_DIGITS + t
+            pos = NUM_DIGITS + t  # position in x_input that predicts output digit t
             if pos < rp.shape[1]:
                 expert = np.argmax(rp[i, pos])
                 routing_counts[op_to_idx[op], expert] += 1
@@ -1001,7 +1001,7 @@ def figa4_perseed_routing():
             routing_frac = np.zeros((3, ne))
             for i, ex in enumerate(examples):
                 for t, op in enumerate(ex['ops']):
-                    pos = NUM_DIGITS + t
+                    pos = NUM_DIGITS + t  # position in x_input that predicts output digit t
                     if pos < rp.shape[1]:
                         expert = np.argmax(rp[i, pos])
                         routing_frac[op_to_idx[op], expert] += 1
@@ -1045,7 +1045,7 @@ def fig10_per_position_ablation():
     seqs = torch.tensor([e['seq'] for e in examples], dtype=torch.long)
     x_input = seqs[:, :-1]
     targets = seqs[:, 1:]
-    out_start = NUM_DIGITS + 1
+    out_start = NUM_DIGITS  # pos in x_input that predicts output digit 0
     out_len = NUM_DIGITS + 1  # ones, tens, hundreds, overflow
     pos_labels = ['Ones\n(+7)', 'Tens', 'Hundreds', 'Overflow']
 
@@ -1142,7 +1142,7 @@ def fig12_activation_patching():
     seqs = torch.tensor([e['seq'] for e in examples], dtype=torch.long)
     x_input = seqs[:, :-1]
     targets = seqs[:, 1:]
-    out_start = NUM_DIGITS + 1
+    out_start = NUM_DIGITS  # pos in x_input that predicts output digit 0
     op_to_idx = {'+7': 0, '+1': 1, '+0': 2}
 
     def get_activations(model, x):

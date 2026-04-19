@@ -136,6 +136,12 @@ def main():
     parser.add_argument('--num_experts', type=int, default=4)
     parser.add_argument('--top_k', type=int, default=1)
     parser.add_argument('--moe_balance_coeff', type=float, default=0.01)
+    parser.add_argument('--intermediate_dim', type=int, default=None,
+                        help='FFN hidden dimension (default: model_dim * 4)')
+    parser.add_argument('--activation', type=str, default='gelu',
+                        choices=['gelu', 'silu', 'relu'])
+    parser.add_argument('--random_routing', action='store_true', default=False,
+                        help='Freeze router weights at init (random routing control)')
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--lr', type=float, default=1e-3)
@@ -164,7 +170,7 @@ def main():
         wandb.init(project=args.wandb_project, config=vars(args))
 
     # Create model
-    model = OneLayerTransformer(
+    model_kwargs = dict(
         model_dim=args.model_dim,
         num_heads=args.num_heads,
         ffn_type=args.ffn_type,
@@ -172,7 +178,12 @@ def main():
         use_norm=args.use_norm,
         num_experts=args.num_experts,
         top_k=args.top_k,
-    ).to(device)
+        activation=args.activation,
+        random_routing=args.random_routing,
+    )
+    if args.intermediate_dim is not None:
+        model_kwargs['intermediate_dim'] = args.intermediate_dim
+    model = OneLayerTransformer(**model_kwargs).to(device)
 
     print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
 
@@ -226,6 +237,7 @@ def main():
                             'use_norm': args.use_norm,
                             'num_experts': args.num_experts,
                             'top_k': args.top_k,
+                            'intermediate_dim': args.intermediate_dim if args.intermediate_dim else args.model_dim * 4,
                         },
                         'args': vars(args),
                     }, ckpt_path)

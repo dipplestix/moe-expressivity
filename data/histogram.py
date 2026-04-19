@@ -5,7 +5,7 @@ from collections import Counter
 
 class HistogramDataset:
     """
-    Histogram counting task from Glorot et al. (2025) "Counting in Small Transformers."
+    Histogram counting task from Behrens et al. (2025) "Counting in Small Transformers."
 
     Given a sequence of tokens from alphabet {0, ..., T-1}, predict the frequency
     of each token in the sequence. For example:
@@ -18,7 +18,7 @@ class HistogramDataset:
     Vocab size = T (alphabet tokens).
     Num classes = L (counts range from 1 to L, mapped to classes 0..L-1).
 
-    Implementation follows SPOC-group/counting-attention (Glorot et al.).
+    Implementation follows SPOC-group/counting-attention (Behrens et al.).
     """
 
     def __init__(
@@ -47,7 +47,7 @@ class HistogramDataset:
 
     def _random_partition(self, n: int, rs: np.random.RandomState) -> list:
         """Recursively partition n into random positive integer parts.
-        Following Glorot et al. backward sampling."""
+        Following Behrens et al. backward sampling."""
         if n == 0:
             return []
         if n == 1:

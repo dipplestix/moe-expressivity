@@ -7,7 +7,7 @@ All experiments use a 1-layer transformer. Four architecture variants: FFN, GLU,
 **Tasks:**
 - **Modular addition**: (a+b) mod 113, full-batch training, 40k epochs — grokking dynamics
 - **Add-7**: x+7 digit-by-digit with carry propagation, SGD, 10k steps — computation structure
-- **Histogram**: count token frequencies (Glorot et al. 2025), T=32, L=10, 1000 epochs — validation of redistribution finding
+- **Histogram**: count token frequencies (Behrens et al. 2025), T=32, L=10, 1000 epochs — validation of redistribution finding
 
 ---
 
@@ -589,7 +589,7 @@ Colors: FFN=blue, GLU=orange, MoE=green, MoE-GLU=red. All figures show all 4 var
 
 ## Histogram Task Results
 
-**Purpose**: Validate the computation redistribution finding on a third task with established theoretical framework (Glorot et al. 2025).
+**Purpose**: Validate the computation redistribution finding on a third task with established theoretical framework (Behrens et al. 2025).
 
 ### Training Results (1000 epochs, 5 seeds)
 

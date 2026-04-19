@@ -22,7 +22,7 @@ ds = ModularAdditionDataset(p=113, train_frac=0.3, seed=42, device="cpu")
 
 ### `histogram.py`
 
-`HistogramDataset` — Token frequency counting, following Glorot et al. (2025).
+`HistogramDataset` — Token frequency counting, following Behrens et al. (2025).
 
 - Generates sequences via backward sampling (random partitioning)
 - Input: sequence of length L from alphabet {0, ..., T-1}
