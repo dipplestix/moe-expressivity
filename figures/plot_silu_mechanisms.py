@@ -37,11 +37,6 @@ bars1 = ax.bar(x - w/2, gelu_means, w, yerr=gelu_errs, color=GELU, edgecolor='wh
 bars2 = ax.bar(x + w/2, silu_means, w, yerr=silu_errs, color=SILU, edgecolor='white',
                linewidth=0.5, capsize=3, error_kw={'linewidth': 0.8}, label='SiLU', zorder=3)
 
-# Annotation: show the redistribution gap
-ax.annotate('', xy=(1 - w/2, 39.0 + 13.2 + 1), xytext=(1 - w/2, 58),
-            arrowprops=dict(arrowstyle='->', color='gray', lw=0.7))
-ax.text(1 - w/2 + 0.05, 58.5, 'MoE\nredistributes', fontsize=5.5, color='gray', ha='center', va='bottom')
-
 ax.set_xticks(x)
 ax.set_xticklabels(labels)
 ax.set_ylabel('No-FFN accuracy (%)')

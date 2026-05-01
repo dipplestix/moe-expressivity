@@ -237,7 +237,10 @@ def main():
                             'use_norm': args.use_norm,
                             'num_experts': args.num_experts,
                             'top_k': args.top_k,
-                            'intermediate_dim': args.intermediate_dim if args.intermediate_dim else args.model_dim * 4,
+                            'intermediate_dim': (args.intermediate_dim if args.intermediate_dim
+                                                 else (args.model_dim * 2 if args.ffn_type == 'glu'
+                                                       else args.model_dim * 4)),
+                            'activation': args.activation,
                         },
                         'args': vars(args),
                     }, ckpt_path)

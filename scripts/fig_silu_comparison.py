@@ -103,19 +103,6 @@ for i in range(n_groups):
 ax.set_ylim(0, 109)
 ax.set_yticks([0, 20, 40, 60, 80, 100])
 
-# Annotate modadd GLU SiLU failure: arrow from text to the outlier dot
-fail_idx = 2  # Mod-Add GLU
-# Position annotation in the empty space between Mod-Add MoE-GLU and Histogram GLU
-mid_gap = (x[3] + x[4]) / 2  # midpoint of the gap between groups
-ax.annotate('1/5 seeds collapses\nto 2.1% accuracy',
-            xy=(x[fail_idx] + bar_width/2, 4),
-            xytext=(mid_gap - 0.1, 50),
-            ha='center', va='bottom', fontsize=6.5,
-            color='#C44E52',
-            arrowprops=dict(arrowstyle='->', color='#C44E52',
-                            lw=0.9, shrinkA=0, shrinkB=3,
-                            connectionstyle='arc3,rad=-0.15'))
-
 # X-axis labels
 ax.set_xticks(x)
 ax.set_xticklabels(labels, fontsize=8)

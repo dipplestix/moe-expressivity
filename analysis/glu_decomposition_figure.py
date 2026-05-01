@@ -186,16 +186,13 @@ def make_figure():
     ax3.grid(True, alpha=0.2, axis='y')
     ax3.set_ylim(0, 0.55)
 
-    # Add values on bars
+    # Bar value labels (data labels, not annotations).
     for i, (bar, val) in enumerate(zip(bars, means)):
         ax3.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.01,
                  f'{val:.3f}', ha='center', fontsize=11, fontweight='bold')
 
-    # Add arrow showing destruction
-    ax3.annotate('', xy=(3, means[3] + 0.03), xytext=(1.5, (means[1] + means[2])/2),
-                 arrowprops=dict(arrowstyle='->', color='red', lw=2))
-    ax3.text(2.2, 0.15, '×', fontsize=20, color='red', ha='center', fontweight='bold')
-
+    # NOTE: superseded by analysis/make_matched_figures.py:fig_glu_decomposition_matched
+    # which uses the parameter-matched checkpoints (h=340) and writes the same path.
     fig.suptitle("How GLU Destroys Per-Neuron Fourier Structure\n"
                  "(Modular Addition, seed 42)", fontsize=15, y=1.05)
     fig.tight_layout()

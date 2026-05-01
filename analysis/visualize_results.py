@@ -372,10 +372,6 @@ def fig3_num_experts():
     ax1.set_ylabel("Epoch to 99% Test Accuracy")
     ax1.set_title("Grokking Speed vs Expert Count")
     ax1.grid(True, alpha=0.2, axis='y')
-    # Annotate E=1
-    ax1.annotate("E=1: has aux loss\nbut doesn't help", xy=(0, ep99_means[0]),
-                 xytext=(0.5, 35000), fontsize=9, ha='left',
-                 arrowprops=dict(arrowstyle='->', color='gray'))
 
     ax2.bar(x, grok_fracs, color='#2ca02c', edgecolor='black', linewidth=0.5)
     ax2.set_xticks(x)
@@ -443,13 +439,6 @@ def fig4_h1_ablation():
     ax.legend()
     ax.set_ylim(0, 1.15)
     ax.grid(True, alpha=0.2, axis='y')
-
-    ax.annotate("FFN critical\nfor FFN/GLU", xy=(0, no_ffn_means[0]),
-                xytext=(0.3, 0.35), fontsize=9, ha='left',
-                arrowprops=dict(arrowstyle='->', color='gray'))
-    ax.annotate("MoE distributes\ncomputation", xy=(2, no_ffn_means[2]),
-                xytext=(2.3, 0.75), fontsize=9, ha='left',
-                arrowprops=dict(arrowstyle='->', color='gray'))
 
     fig.tight_layout()
     fig.savefig("figures/fig4_h1_ablation.png")
@@ -640,13 +629,6 @@ def fig7_width_scaling():
     ax.legend()
     ax.grid(True, alpha=0.2, axis='y')
 
-    # Add speedup annotations
-    for i in range(len(widths)):
-        if moe_means[i] > 0 and ffn_means[i] > 0:
-            speedup = ffn_means[i] / moe_means[i]
-            ax.text(i, max(ffn_means[i], moe_means[i]) + ffn_stds[i] + 500,
-                    f"{speedup:.1f}x", ha='center', fontsize=10, fontweight='bold')
-
     fig.tight_layout()
     fig.savefig("figures/fig7_width_scaling.png")
     print("Saved fig7_width_scaling.png")
@@ -797,10 +779,6 @@ def fig8_h1_ablation_modadd():
     ax.set_ylim(0, 1.15)
     ax.grid(True, alpha=0.2, axis='y')
 
-    ax.annotate("Both components\ncritical (~1% without either)", xy=(1, no_ffn_means[1]),
-                xytext=(1.5, 0.4), fontsize=9, ha='left',
-                arrowprops=dict(arrowstyle='->', color='gray'))
-
     fig.tight_layout()
     fig.savefig("figures/fig8_h1_ablation_modadd.png")
     print("Saved fig8_h1_ablation_modadd.png")
@@ -936,10 +914,6 @@ def figa3_norm_ablation_add7():
     ax1.legend()
     ax1.set_ylim(0, 1.15)
     ax1.grid(True, alpha=0.2, axis='y')
-    ax1.annotate(f"{norm_ffn_means[2]:.0%} with norm\n{nonorm_ffn_means[2]:.0%} without",
-                 xy=(2 - width / 2, norm_ffn_means[2]),
-                 xytext=(2.5, 0.85), fontsize=9, ha='left',
-                 arrowprops=dict(arrowstyle='->', color='gray'))
 
     # Panel (b): No-Attn accuracy comparison
     norm_attn_means = [all_results['norm'][f]['no_attn'][0] for f in ftypes]
