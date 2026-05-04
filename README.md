@@ -10,6 +10,59 @@ Requires Python 3.13+ and [`uv`](https://docs.astral.sh/uv/).
 uv sync
 ```
 
+## Pre-trained checkpoints
+
+All trained model checkpoints used in the paper (5 seeds per condition, every task / architecture / routing variant) are hosted anonymously on the Hugging Face Hub:
+
+> <https://huggingface.co/Sparsity-Moves-Computation/moe-redistribution-checkpoints>
+
+The repository can be downloaded without a Hugging Face account.
+
+### Bulk download (recommended)
+
+Pull the whole `checkpoints/` tree at once:
+
+```bash
+hf download Sparsity-Moves-Computation/moe-redistribution-checkpoints \
+    --repo-type model \
+    --local-dir checkpoints/
+```
+
+(Older `huggingface-cli` syntax: `huggingface-cli download Sparsity-Moves-Computation/moe-redistribution-checkpoints --local-dir checkpoints/`.)
+
+The download is resumable; rerunning the same command skips files already present.
+
+### Selective download (Python API)
+
+To grab a single checkpoint from a script:
+
+```python
+from huggingface_hub import hf_hub_download
+import torch
+
+path = hf_hub_download(
+    repo_id="Sparsity-Moves-Computation/moe-redistribution-checkpoints",
+    filename="add7_ffn_nonorm_s42/best_model.pt",
+)
+ck = torch.load(path, weights_only=False, map_location="cpu")
+print(ck["config"], ck.get("accuracy"))
+```
+
+### Layout
+
+After downloading, the local `checkpoints/` directory mirrors the run names used by the training scripts:
+
+```
+checkpoints/
+  <task>_<arch>_<config>_s<seed>/
+    best_model.pt          # add-7, histogram
+    modadd_best.pt         # modular addition
+```
+
+`<task>` ∈ `{add7, modadd, hist}` · `<arch>` ∈ `{ffn, glu, moe, moe_glu}` · `<config>` encodes width / activation / normalization / routing variant (e.g. `nonorm`, `narrow_nonorm`, `topk2_nonorm`, `randroute_nonorm`, `d170_silu_nonorm`).
+
+Each `.pt` file contains a Python dict with `model_state_dict`, `config`, and one of `accuracy` / `test_acc` / `step` / `epoch`. The `config` dict holds architectural hyperparameters only (no identifying metadata).
+
 ## Quick start
 
 Train one model:
@@ -68,7 +121,7 @@ Each subdirectory has its own README with details:
 
 The training scripts skip checkpoints that already exist, so a typical workflow is:
 
-1. `bash scripts/<run_*.sh>` to train all seeds for a sweep
+1. `bash scripts/<run_*.sh>` to train all seeds for a sweep, **or** download pre-trained checkpoints (see [Pre-trained checkpoints](#pre-trained-checkpoints)) to skip training entirely
 2. `uv run python analysis/<figure_script>.py` to read the resulting checkpoints and write figures
 
 Checkpoints are written to `checkpoints/<task>_<variant>_s<seed>/best_model.pt` (or `<task>_best.pt` for tasks that don't use a separate val split). The shell scripts pass the checkpoint directory as an argument, and the analysis scripts iterate seeds 42, 137, 256, 512, 1024.
