@@ -8,7 +8,7 @@ import numpy as np
 
 LAMBDA_AUX_VALUES = [0.0, 0.001, 0.01, 0.1, 1.0]
 SEEDS = [42, 137, 256, 512, 1024]
-CHECKPOINT_DIR = Path("/Users/gabesmithline/Desktop/moe-expressivity/checkpoints")
+CHECKPOINT_DIR = Path("<PATH_TO_REPO>/checkpoints")
 
 results = defaultdict(list)
 

@@ -6,7 +6,7 @@ import matplotlib
 matplotlib.rcParams['font.family'] = 'sans-serif'
 matplotlib.rcParams['font.sans-serif'] = ['Arial', 'Helvetica', 'DejaVu Sans']
 
-CKPT = "/Users/gabesmithline/Desktop/moe-expressivity/checkpoints"
+CKPT = "<PATH_TO_REPO>/checkpoints"
 SEEDS = [42, 137, 256, 512, 1024]
 
 conditions = [
@@ -136,7 +136,7 @@ ax.legend(fontsize=8, loc='lower left', frameon=False, ncol=2)
 plt.tight_layout()
 plt.subplots_adjust(top=0.88)
 
-outdir = "/Users/gabesmithline/Desktop/moe-expressivity/figures"
+outdir = "<PATH_TO_REPO>/figures"
 fig.savefig(f"{outdir}/fig_silu_comparison.png", dpi=300, bbox_inches='tight')
 fig.savefig(f"{outdir}/fig_silu_comparison.pdf", dpi=300, bbox_inches='tight')
 print(f"\nSaved to {outdir}/fig_silu_comparison.png and .pdf")

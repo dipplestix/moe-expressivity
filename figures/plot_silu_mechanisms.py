@@ -113,6 +113,6 @@ for ax in axes:
     ax.tick_params(width=0.6, length=3)
 
 plt.tight_layout(w_pad=1.8)
-fig.savefig('/Users/gabesmithline/Desktop/moe-expressivity/figures/fig_silu_mechanisms.png', dpi=300, bbox_inches='tight')
-fig.savefig('/Users/gabesmithline/Desktop/moe-expressivity/figures/fig_silu_mechanisms.pdf', bbox_inches='tight')
+fig.savefig('<PATH_TO_REPO>/figures/fig_silu_mechanisms.png', dpi=300, bbox_inches='tight')
+fig.savefig('<PATH_TO_REPO>/figures/fig_silu_mechanisms.pdf', bbox_inches='tight')
 print('Saved PNG and PDF.')
