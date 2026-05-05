@@ -1,11 +1,15 @@
 import torch
 import torch.nn.functional as F
-import wandb
 import argparse
 import sys
 from pathlib import Path
 sys.path.insert(0, 'model')
 from model import OneLayerTransformer
+
+try:
+    import wandb
+except ImportError:
+    wandb = None
 
 
 # Token definitions
@@ -128,13 +132,23 @@ def main():
     parser.add_argument('--num_digits', type=int, default=2)
     parser.add_argument('--model_dim', type=int, default=64)
     parser.add_argument('--num_heads', type=int, default=4)
-    parser.add_argument('--ffn_type', type=str, default='ffn', choices=['ffn', 'glu'])
+    parser.add_argument('--ffn_type', type=str, default='ffn', choices=['ffn', 'glu', 'moe', 'moe_glu'])
+    parser.add_argument('--num_experts', type=int, default=4)
+    parser.add_argument('--top_k', type=int, default=1)
+    parser.add_argument('--moe_balance_coeff', type=float, default=0.01)
+    parser.add_argument('--intermediate_dim', type=int, default=None,
+                        help='FFN hidden dimension (default: model_dim * 4)')
+    parser.add_argument('--activation', type=str, default='gelu',
+                        choices=['gelu', 'silu', 'relu'])
+    parser.add_argument('--random_routing', action='store_true', default=False,
+                        help='Freeze router weights at init (random routing control)')
+    parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--lr', type=float, default=1e-3)
     parser.add_argument('--max_grad_norm', type=float, default=1.0, help='Gradient clipping norm')
     parser.add_argument('--steps', type=int, default=5000)
     parser.add_argument('--eval_interval', type=int, default=100)
-    parser.add_argument('--patience', type=int, default=5, help='Stop if no improvement for N evals')
+    parser.add_argument('--patience', type=int, default=50, help='Stop if no improvement for N evals')
     parser.add_argument('--checkpoint_dir', type=str, default='checkpoints')
     parser.add_argument('--wandb_project', type=str, default='add-7-transformer')
     parser.add_argument('--no_wandb', action='store_true')
@@ -145,18 +159,31 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
 
+    # Set random seed
+    torch.manual_seed(args.seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(args.seed)
+
     # Initialize wandb
-    if not args.no_wandb:
+    use_wandb = not args.no_wandb and wandb is not None
+    if use_wandb:
         wandb.init(project=args.wandb_project, config=vars(args))
 
     # Create model
-    model = OneLayerTransformer(
+    model_kwargs = dict(
         model_dim=args.model_dim,
         num_heads=args.num_heads,
         ffn_type=args.ffn_type,
         vocab_size=VOCAB_SIZE,
         use_norm=args.use_norm,
-    ).to(device)
+        num_experts=args.num_experts,
+        top_k=args.top_k,
+        activation=args.activation,
+        random_routing=args.random_routing,
+    )
+    if args.intermediate_dim is not None:
+        model_kwargs['intermediate_dim'] = args.intermediate_dim
+    model = OneLayerTransformer(**model_kwargs).to(device)
 
     print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
 
@@ -177,6 +204,8 @@ def main():
 
         optimizer.zero_grad()
         loss = compute_loss(model, sequences, input_len)
+        if args.ffn_type in ('moe', 'moe_glu'):
+            loss = loss + args.moe_balance_coeff * model._aux_loss
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
         optimizer.step()
@@ -200,7 +229,20 @@ def main():
                         'model_state_dict': model.state_dict(),
                         'optimizer_state_dict': optimizer.state_dict(),
                         'accuracy': acc,
-                        'config': vars(args),
+                        'config': {
+                            'model_dim': args.model_dim,
+                            'num_heads': args.num_heads,
+                            'ffn_type': args.ffn_type,
+                            'vocab_size': VOCAB_SIZE,
+                            'use_norm': args.use_norm,
+                            'num_experts': args.num_experts,
+                            'top_k': args.top_k,
+                            'intermediate_dim': (args.intermediate_dim if args.intermediate_dim
+                                                 else (args.model_dim * 2 if args.ffn_type == 'glu'
+                                                       else args.model_dim * 4)),
+                            'activation': args.activation,
+                        },
+                        'args': vars(args),
                     }, ckpt_path)
                     print(f"Saved best model to {ckpt_path}")
                 else:
@@ -211,14 +253,14 @@ def main():
             else:
                 print(f"Step {step}: loss={loss.item():.4f}")
 
-            if not args.no_wandb:
+            if use_wandb:
                 wandb.log(log_dict)
 
     # Final evaluation
     final_acc = evaluate(model, args.num_digits, device, num_samples=1000)
     print(f"\nFinal accuracy: {final_acc:.2%}")
 
-    if not args.no_wandb:
+    if use_wandb:
         wandb.log({'final_accuracy': final_acc})
         wandb.finish()
 

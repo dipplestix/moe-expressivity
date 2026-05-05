@@ -1,0 +1,68 @@
+<svg width="100%" viewBox="0 0 800 280" role="img" xmlns="http://www.w3.org/2000/svg" style="background: #ffffff;">
+<title>FFN architecture variants: active parameters per token (add-7)</title>
+<desc>Dense FFN, GLU, MoE top-1, MoE top-2, and MoE-GLU top-1 routing showing per-token active hidden units. Inactive expert blocks are dormant for the current token but train and activate on other routed tokens.</desc>
+
+<defs>
+  <pattern id="hatch-inactive" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
+    <rect width="8" height="8" fill="#D8DDE0"/>
+    <line x1="0" y1="0" x2="0" y2="8" stroke="#7E8A95" stroke-width="2"/>
+  </pattern>
+</defs>
+
+<!-- ===== Top legend ===== -->
+<rect x="240" y="12" width="14" height="14" rx="2" fill="#5E9930"/>
+<text x="260" y="23" font-family="'Helvetica','Arial',sans-serif" font-size="16" font-weight="700" fill="#0D0D0D">active for this token</text>
+<rect x="430" y="12" width="14" height="14" rx="2" fill="url(#hatch-inactive)" stroke="#7E8A95" stroke-width="0.6"/>
+<text x="450" y="23" font-family="'Helvetica','Arial',sans-serif" font-size="16" font-weight="700" fill="#0D0D0D">inactive for this token (active on other tokens)</text>
+
+<!-- ===== Card 1: Dense FFN  (x=14) ===== -->
+<rect x="14" y="42" width="148" height="192" rx="12" fill="#FAFAF8" stroke="#D6D4CC" stroke-width="0.6"/>
+<text x="88" y="68" text-anchor="middle" font-family="'Helvetica','Arial',sans-serif" font-size="15" font-weight="700" fill="#1A1A1A">Dense FFN</text>
+<rect x="38" y="92" width="100" height="64" rx="4" fill="#5E9930"/>
+<text x="88" y="178" text-anchor="middle" font-family="'Helvetica','Arial',sans-serif" font-size="15" font-weight="700" fill="#1A1A1A">256 / 256</text>
+<text x="88" y="198" text-anchor="middle" font-family="'Helvetica','Arial',sans-serif" font-size="15" font-weight="700" fill="#0D0D0D">active per token</text>
+
+<!-- ===== Card 2: GLU  (x=170) ===== -->
+<rect x="170" y="42" width="148" height="192" rx="12" fill="#FAFAF8" stroke="#D6D4CC" stroke-width="0.6"/>
+<text x="244" y="68" text-anchor="middle" font-family="'Helvetica','Arial',sans-serif" font-size="15" font-weight="700" fill="#1A1A1A">GLU</text>
+<rect x="211" y="92" width="66" height="64" rx="4" fill="#5E9930"/>
+<text x="244" y="178" text-anchor="middle" font-family="'Helvetica','Arial',sans-serif" font-size="15" font-weight="700" fill="#1A1A1A">170 / 170</text>
+<text x="244" y="198" text-anchor="middle" font-family="'Helvetica','Arial',sans-serif" font-size="15" font-weight="700" fill="#0D0D0D">active per token</text>
+
+<!-- ===== Card 3: MoE top-1  (x=326) ===== -->
+<rect x="326" y="42" width="148" height="192" rx="12" fill="#FAFAF8" stroke="#D6D4CC" stroke-width="0.6"/>
+<text x="400" y="68" text-anchor="middle" font-family="'Helvetica','Arial',sans-serif" font-size="15" font-weight="700" fill="#1A1A1A">MoE top-1</text>
+<rect x="350" y="92" width="22" height="64" rx="3" fill="#5E9930"/>
+<rect x="376" y="92" width="22" height="64" rx="3" fill="url(#hatch-inactive)" stroke="#7E8A95" stroke-width="0.6"/>
+<rect x="402" y="92" width="22" height="64" rx="3" fill="url(#hatch-inactive)" stroke="#7E8A95" stroke-width="0.6"/>
+<rect x="428" y="92" width="22" height="64" rx="3" fill="url(#hatch-inactive)" stroke="#7E8A95" stroke-width="0.6"/>
+<text x="400" y="178" text-anchor="middle" font-family="'Helvetica','Arial',sans-serif" font-size="15" font-weight="700" fill="#1A1A1A">64 / 256</text>
+<text x="400" y="198" text-anchor="middle" font-family="'Helvetica','Arial',sans-serif" font-size="15" font-weight="700" fill="#0D0D0D">active per token</text>
+<text x="400" y="216" text-anchor="middle" font-family="'Helvetica','Arial',sans-serif" font-size="15" font-weight="700" fill="#0D0D0D">(1 of 4 experts)</text>
+
+<!-- ===== Card 4: MoE top-2  (x=482) ===== -->
+<rect x="482" y="42" width="148" height="192" rx="12" fill="#FAFAF8" stroke="#D6D4CC" stroke-width="0.6"/>
+<text x="556" y="68" text-anchor="middle" font-family="'Helvetica','Arial',sans-serif" font-size="15" font-weight="700" fill="#1A1A1A">MoE top-2</text>
+<rect x="506" y="92" width="22" height="64" rx="3" fill="#5E9930"/>
+<rect x="532" y="92" width="22" height="64" rx="3" fill="#5E9930"/>
+<rect x="558" y="92" width="22" height="64" rx="3" fill="url(#hatch-inactive)" stroke="#7E8A95" stroke-width="0.6"/>
+<rect x="584" y="92" width="22" height="64" rx="3" fill="url(#hatch-inactive)" stroke="#7E8A95" stroke-width="0.6"/>
+<text x="556" y="178" text-anchor="middle" font-family="'Helvetica','Arial',sans-serif" font-size="15" font-weight="700" fill="#1A1A1A">128 / 256</text>
+<text x="556" y="198" text-anchor="middle" font-family="'Helvetica','Arial',sans-serif" font-size="15" font-weight="700" fill="#0D0D0D">active per token</text>
+<text x="556" y="216" text-anchor="middle" font-family="'Helvetica','Arial',sans-serif" font-size="15" font-weight="700" fill="#0D0D0D">(2 of 4 experts)</text>
+
+<!-- ===== Card 5: MoE-GLU top-1  (x=638) ===== -->
+<rect x="638" y="42" width="148" height="192" rx="12" fill="#FAFAF8" stroke="#D6D4CC" stroke-width="0.6"/>
+<text x="712" y="68" text-anchor="middle" font-family="'Helvetica','Arial',sans-serif" font-size="15" font-weight="700" fill="#1A1A1A">MoE-GLU top-1</text>
+<rect x="679" y="92" width="14" height="64" rx="3" fill="#5E9930"/>
+<rect x="697" y="92" width="14" height="64" rx="3" fill="url(#hatch-inactive)" stroke="#7E8A95" stroke-width="0.6"/>
+<rect x="715" y="92" width="14" height="64" rx="3" fill="url(#hatch-inactive)" stroke="#7E8A95" stroke-width="0.6"/>
+<rect x="733" y="92" width="14" height="64" rx="3" fill="url(#hatch-inactive)" stroke="#7E8A95" stroke-width="0.6"/>
+<text x="712" y="178" text-anchor="middle" font-family="'Helvetica','Arial',sans-serif" font-size="15" font-weight="700" fill="#1A1A1A">42 / 170</text>
+<text x="712" y="198" text-anchor="middle" font-family="'Helvetica','Arial',sans-serif" font-size="15" font-weight="700" fill="#0D0D0D">active per token</text>
+<text x="712" y="216" text-anchor="middle" font-family="'Helvetica','Arial',sans-serif" font-size="15" font-weight="700" fill="#0D0D0D">(1 of 4 experts)</text>
+
+<!-- ===== Footer: denominator clarifier ===== -->
+<text x="400" y="258" text-anchor="middle" font-family="'Helvetica','Arial',sans-serif" font-size="16" font-weight="700" fill="#0D0D0D">active hidden units  /  total hidden units for this variant</text>
+
+</svg>

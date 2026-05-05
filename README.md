@@ -1,103 +1,131 @@
-# MoE Expressivity
+# Sparsity Moves Computation: How FFN Architecture Reshapes Attention in Small Transformers
 
-Investigating how different FFN architectures affect what attention learns in a minimal transformer setting.
-
-## Motivation
-
-We train a one-layer transformer to add 7 to a number (represented digit-by-digit in reversed order). This task has a simple, well-defined structure:
-
-1. **First digit:** Add 7 (may overflow)
-2. **Second digit:** Add 1 if first digit overflows (>=10)
-3. **All other digits:** Add 1 if there's a carry chain (all preceding digits were 9 and overflowed)
-
-Example: `593 + 7 = 600`
-- Input (reversed): `3 9 5`
-- Output (reversed): `0 0 6`
-- Pattern: 3+7=10 (overflow) -> 9+1=10 (overflow) -> 5+1=6
-
-## Research Question
-
-How does the choice of FFN architecture affect what the attention mechanism learns?
-
-We compare three architectures (matched for parameter count):
-1. **Standard FFN** - Dense feedforward with 4x hidden dimension
-2. **GLU** - Gated Linear Unit
-3. **MoE** - Mixture of Experts (with both FFN and GLU variants)
-
-Inspired by [Yuan et al. (2025)](https://arxiv.org/abs/2506.01115) which analyzes attention patterns in arithmetic tasks.
+Code for studying how the choice of FFN architecture (dense FFN, GLU, MoE, MoE-GLU) shapes computation in 1-layer transformers on three algorithmic tasks: add-7, modular addition, and histogram counting.
 
 ## Installation
+
+Requires Python 3.13+ and [`uv`](https://docs.astral.sh/uv/).
 
 ```bash
 uv sync
 ```
 
-## Usage
+## Pre-trained checkpoints
+
+All trained model checkpoints used in the paper (5 seeds per condition, every task / architecture / routing variant) are hosted anonymously on the Hugging Face Hub:
+
+> <https://huggingface.co/Sparsity-Moves-Computation/moe-redistribution-checkpoints>
+
+The repository can be downloaded without a Hugging Face account.
+
+### Bulk download (recommended)
+
+Pull the whole `checkpoints/` tree at once:
 
 ```bash
-# Train with standard FFN
-uv run python train.py --ffn_type ffn --num_digits 2
-
-# Train with GLU
-uv run python train.py --ffn_type glu --num_digits 2
-
-# Disable wandb for local testing
-uv run python train.py --no_wandb --patience 3
-
-# Train with register tokens (inspired by "Vision Transformers Need Registers")
-uv run python train_with_registers.py --num_registers 1 --num_digits 2
-
-# Train with multiple register tokens
-uv run python train_with_registers.py --num_registers 4 --num_digits 2
+hf download Sparsity-Moves-Computation/moe-redistribution-checkpoints \
+    --repo-type model \
+    --local-dir checkpoints/
 ```
 
-### Options
+(Older `huggingface-cli` syntax: `huggingface-cli download Sparsity-Moves-Computation/moe-redistribution-checkpoints --local-dir checkpoints/`.)
 
-| Argument | Default | Description |
-|----------|---------|-------------|
-| `--num_digits` | 2 | Number of input digits |
-| `--num_registers` | 1 | Number of register tokens (train_with_registers.py only) |
-| `--model_dim` | 64 | Model dimension |
-| `--num_heads` | 4 | Number of attention heads |
-| `--ffn_type` | ffn | FFN type: `ffn` or `glu` |
-| `--batch_size` | 128 | Batch size |
-| `--lr` | 1e-3 | Learning rate |
-| `--max_grad_norm` | 1.0 | Gradient clipping |
-| `--steps` | 5000 | Max training steps |
-| `--eval_interval` | 100 | Evaluation frequency |
-| `--patience` | 5 | Early stopping patience |
-| `--checkpoint_dir` | checkpoints | Checkpoint directory |
-| `--no_wandb` | False | Disable wandb logging |
+The download is resumable; rerunning the same command skips files already present.
 
-## Analysis Notebooks
+### Selective download (Python API)
 
-The project includes [Marimo](https://marimo.io/) notebooks for interpretability analysis:
+To grab a single checkpoint from a script:
+
+```python
+from huggingface_hub import hf_hub_download
+import torch
+
+path = hf_hub_download(
+    repo_id="Sparsity-Moves-Computation/moe-redistribution-checkpoints",
+    filename="add7_ffn_nonorm_s42/best_model.pt",
+)
+ck = torch.load(path, weights_only=False, map_location="cpu")
+print(ck["config"], ck.get("accuracy"))
+```
+
+### Layout
+
+After downloading, the local `checkpoints/` directory mirrors the run names used by the training scripts:
+
+```
+checkpoints/
+  <task>_<arch>_<config>_s<seed>/
+    best_model.pt          # add-7, histogram
+    modadd_best.pt         # modular addition
+```
+
+`<task>` ∈ `{add7, modadd, hist}` · `<arch>` ∈ `{ffn, glu, moe, moe_glu}` · `<config>` encodes width / activation / normalization / routing variant (e.g. `nonorm`, `narrow_nonorm`, `topk2_nonorm`, `randroute_nonorm`, `d170_silu_nonorm`).
+
+Each `.pt` file contains a Python dict with `model_state_dict`, `config`, and one of `accuracy` / `test_acc` / `step` / `epoch`. The `config` dict holds architectural hyperparameters only (no identifying metadata).
+
+## Quick start
+
+Train one model:
 
 ```bash
-# FFN activation analysis for digit overflow patterns
-uv run marimo edit ffn_activation_analysis.py
-
-# TransformerLens-based activation analysis
-uv run marimo edit tl_activation_analysis.py
-
-# Captum interpretability demo
-uv run marimo edit captum_demo.py
+uv run python train.py --ffn_type moe --num_digits 3 --no_wandb
 ```
 
-## Project Structure
+Run a multi-seed sweep (these wrap `train.py` / `train_modular_addition.py` / `train_histogram.py`):
 
-```
-├── model/
-│   ├── components.py          # MHA, FFN, GLU implementations
-│   └── model.py               # OneLayerTransformer
-├── train.py                   # Training script
-├── train_with_registers.py    # Training with register tokens
-├── ffn_activation_analysis.py # FFN activation patterns (Marimo)
-├── tl_activation_analysis.py  # TransformerLens analysis (Marimo)
-├── captum_demo.py             # Captum interpretability demo (Marimo)
-└── checkpoints/               # Saved models
+```bash
+bash scripts/run_multiseed.sh                # modadd, 4 variants x 5 seeds
+bash scripts/run_add7_multiseed.sh           # add-7, 4 variants x 5 seeds
+bash scripts/run_histogram_multiseed.sh      # histogram, 4 variants x 5 seeds
 ```
 
-## Status
+Regenerate figures from trained checkpoints:
 
-Work in progress. MoE implementation coming soon.
+```bash
+uv run python analysis/visualize_results.py             # main figures
+uv run python analysis/make_matched_ablation_figures.py # parameter-matched ablations
+uv run python analysis/make_matched_figures.py          # per-position + routing
+uv run python analysis/make_matched_fourier_figure.py   # Fourier-concentration histograms
+```
+
+## Repository layout
+
+```
+model/         architecture (FFN/GLU/MoE/MoE-GLU + 1-layer transformer)
+formerlens/    TransformerLens-compatible hooked variants for interpretability
+data/          dataset classes for add-7, modular addition, histogram
+train*.py      training entry points (add-7 = train.py, others named per-task)
+scripts/       shell runners for multi-seed sweeps and reproducibility
+analysis/      analysis + figure-generation scripts
+figures/       generated figures (PNG / PDF / SVG)
+checkpoints/   trained model checkpoints (one directory per run)
+archive/       superseded notebooks / scripts kept for reference
+```
+
+Each subdirectory has its own README with details:
+
+- [`model/README.md`](model/README.md) — architecture and component classes
+- [`formerlens/README.md`](formerlens/README.md) — hook points and interpretability API
+- [`data/README.md`](data/README.md) — dataset construction and tokenization
+- [`scripts/README.md`](scripts/README.md) — full list of training scripts
+- [`analysis/README.md`](analysis/README.md) — analysis scripts and figure mapping
+
+## Key tokens
+
+- Digits: 0-9
+- `PAD_TOKEN`: 10
+- `EOS_TOKEN`: 11
+- `REG_TOKEN`: 12 (register-token training only)
+
+## Reproducing a single result
+
+The training scripts skip checkpoints that already exist, so a typical workflow is:
+
+1. `bash scripts/<run_*.sh>` to train all seeds for a sweep, **or** download pre-trained checkpoints (see [Pre-trained checkpoints](#pre-trained-checkpoints)) to skip training entirely
+2. `uv run python analysis/<figure_script>.py` to read the resulting checkpoints and write figures
+
+Checkpoints are written to `checkpoints/<task>_<variant>_s<seed>/best_model.pt` (or `<task>_best.pt` for tasks that don't use a separate val split). The shell scripts pass the checkpoint directory as an argument, and the analysis scripts iterate seeds 42, 137, 256, 512, 1024.
+
+## License
+
+See [LICENSE](LICENSE).
