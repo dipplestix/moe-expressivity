@@ -123,13 +123,6 @@ Tracks L2 norm of attention and FFN weights over training during grokking on mod
 
 Pearce et al. (2024) bilinear tensor decomposition of GLU weights. Constructs T_ijk = W_down[i,m] * W_gate[m,j] * W_up[m,k] and analyzes SVD. Tests whether Fourier structure hidden from activations is visible in weights (result: it's not — weight Fourier concentration is also 0.07).
 
-## Note on ModAdd DLA and Attention Patterns
-
-The modular addition DLA and attention pattern analyses were run inline (not as separate scripts). Results:
-- DLA: FFN dominates 88-99% of correct logits across all variants. MoE has highest attention fraction (11.4%).
-- Attention: All variants show identical 50/50 a/b patterns at = position. No specialization.
-- Figures: `fig_dla_cross_task.png`, `fig_attn_modadd.png`
-
 ## Legacy Scripts
 
 Moved to `archive/` — from earlier exploration, not used in the paper.
