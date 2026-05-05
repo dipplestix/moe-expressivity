@@ -1,4 +1,4 @@
-# moe-expressivity
+# Sparsity Moves Computation: How FFN Architecture Reshapes Attention in Small Transformers
 
 Code for studying how the choice of FFN architecture (dense FFN, GLU, MoE, MoE-GLU) shapes computation in 1-layer transformers on three algorithmic tasks: add-7, modular addition, and histogram counting.
 
