@@ -30,7 +30,7 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn.functional as F
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path("<PATH_TO_REPO>")
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "model"))

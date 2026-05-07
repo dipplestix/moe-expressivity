@@ -5,7 +5,7 @@ Consistent colors: FFN=blue, GLU=orange, MoE=green, MoE-GLU=red
 
 import sys
 import os
-os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+os.chdir("<PATH_TO_REPO>")
 
 import numpy as np
 import torch

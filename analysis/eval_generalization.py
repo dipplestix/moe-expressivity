@@ -7,7 +7,7 @@ Evaluates all 4 variants x 5 seeds, reports per-variant accuracy.
 
 import sys
 import os
-os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+os.chdir("<PATH_TO_REPO>")
 sys.path.insert(0, ".")
 sys.path.insert(0, "model")
 

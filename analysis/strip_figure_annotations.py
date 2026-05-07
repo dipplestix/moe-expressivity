@@ -13,7 +13,7 @@ coordinates (origin top-left).
 from pathlib import Path
 from PIL import Image, ImageDraw
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path("<PATH_TO_REPO>")
 WHITE = (255, 255, 255)
 
 JOBS = [

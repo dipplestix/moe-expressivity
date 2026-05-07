@@ -17,7 +17,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path("<PATH_TO_REPO>")
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "model"))
 

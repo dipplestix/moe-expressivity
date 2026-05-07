@@ -3,8 +3,6 @@ Figure: SiLU activation robustness check for three main mechanistic findings.
 3-panel figure for NeurIPS full-width (6.75 inches).
 """
 
-import os
-
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -115,7 +113,6 @@ for ax in axes:
     ax.tick_params(width=0.6, length=3)
 
 plt.tight_layout(w_pad=1.8)
-_FIG_DIR = os.path.dirname(os.path.abspath(__file__))
-fig.savefig(os.path.join(_FIG_DIR, 'fig_silu_mechanisms.png'), dpi=300, bbox_inches='tight')
-fig.savefig(os.path.join(_FIG_DIR, 'fig_silu_mechanisms.pdf'), bbox_inches='tight')
+fig.savefig('<PATH_TO_REPO>/figures/fig_silu_mechanisms.png', dpi=300, bbox_inches='tight')
+fig.savefig('<PATH_TO_REPO>/figures/fig_silu_mechanisms.pdf', bbox_inches='tight')
 print('Saved PNG and PDF.')

@@ -7,7 +7,7 @@ Reviewer-requested analyses that run on existing checkpoints.
 
 import sys
 import os
-os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+os.chdir("<PATH_TO_REPO>")
 sys.path.insert(0, "model")
 
 import numpy as np
