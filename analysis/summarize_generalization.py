@@ -8,7 +8,7 @@ import numpy as np
 from pathlib import Path
 import os
 
-os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+os.chdir("<PATH_TO_REPO>")
 
 VARIANTS = ['ffn', 'glu', 'moe', 'moe_glu']
 SEEDS = [42, 137, 256, 512, 1024]

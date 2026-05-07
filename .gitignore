@@ -1,46 +1,22 @@
-# Dependencies
+
 uv.lock
 .venv
 .venv/
 
-# Python
 __pycache__/
 *.py[cod]
 
-# Training artifacts
 checkpoints/
 wandb/
 
-# IDE
+
 .idea/
 .vscode/
 __marimo__/
-CLAUDE.MD
 
-# Paper (LaTeX + planning)
-paper/
-paper.zip
-texput.log
-*.aux
-*.bbl
-*.blg
-*.log
-*.out
-*.toc
-*.fls
-*.fdb_latexmk
-*.synctex.gz
-
-# Outlines / planning docs
-*.txt
 !requirements*.txt
 
-# Paper drop-ins / resume notes / overleaf bundles (paper-related, do not commit)
-OVERLEAF_DROPINS.md
-RESUME_NOTE.md
-paper_overleaf.zip
 
-# Research notes / experiment logs (kept local, not part of public repo)
 experiments.md
 results_all_experiments.md
 results_generalization.json
@@ -48,5 +24,4 @@ results_generalization.json
 # OS junk
 .DS_Store
 
-# Figure backups / scratch
 *.bak

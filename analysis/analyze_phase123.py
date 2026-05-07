@@ -12,8 +12,8 @@ import numpy as np
 import torch
 from scipy.stats import mannwhitneyu
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "model"))
+sys.path.insert(0, "<PATH_TO_REPO>")
+sys.path.insert(0, "<PATH_TO_REPO>/model")
 
 from model import OneLayerTransformer
 

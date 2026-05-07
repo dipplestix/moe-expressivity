@@ -10,7 +10,7 @@ import numpy as np
 from pathlib import Path
 from sklearn.metrics import normalized_mutual_info_score
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "model"))
+sys.path.insert(0, "<PATH_TO_REPO>/model")
 from model import OneLayerTransformer
 
 # Constants
@@ -229,7 +229,7 @@ def run_analysis(label, ckpt_template, activation, seeds):
 
 
 def main():
-    base = Path(__file__).resolve().parent.parent / "checkpoints"
+    base = Path("<PATH_TO_REPO>/checkpoints")
 
     silu_nmis = run_analysis(
         "SiLU MoE-GLU (nonorm)",

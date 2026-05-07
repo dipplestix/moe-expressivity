@@ -10,7 +10,7 @@ For each variant:
 
 import sys
 import os
-os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+os.chdir("<PATH_TO_REPO>")
 import numpy as np
 import torch
 import torch.nn.functional as F

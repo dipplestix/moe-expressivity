@@ -17,7 +17,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path("<PATH_TO_REPO>")
 sys.path.insert(0, str(ROOT))
 
 from analysis.analyze_activation_symmetry import SEEDS, load_model, build_add7_data

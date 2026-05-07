@@ -14,7 +14,7 @@ Analyses:
 
 import sys
 import os
-os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+os.chdir("<PATH_TO_REPO>")
 sys.path.insert(0, ".")
 sys.path.insert(0, "model")
 
@@ -178,7 +178,8 @@ def plot_ablation_by_carry():
     seqs = torch.tensor([e['seq'] for e in examples], dtype=torch.long)
     x_input = seqs[:, :-1]
     targets = seqs[:, 1:]
-    out_start = NUM_DIGITS + 1
+    out_start = NUM_DIGITS  # average over o0..o3 only (digit-only metric)
+    out_end = out_start + (NUM_DIGITS + 1)
 
     carry_lens = np.array([e['carry_len'] for e in examples])
 
@@ -217,9 +218,9 @@ def plot_ablation_by_carry():
                 mask = carry_lens == L
                 if mask.sum() == 0:
                     continue
-                normal_acc = (preds[mask, out_start:] == targets[mask, out_start:]).float().mean().item()
-                na_acc = (preds_na[mask, out_start:] == targets[mask, out_start:]).float().mean().item()
-                nf_acc = (preds_nf[mask, out_start:] == targets[mask, out_start:]).float().mean().item()
+                normal_acc = (preds[mask, out_start:out_end] == targets[mask, out_start:out_end]).float().mean().item()
+                na_acc = (preds_na[mask, out_start:out_end] == targets[mask, out_start:out_end]).float().mean().item()
+                nf_acc = (preds_nf[mask, out_start:out_end] == targets[mask, out_start:out_end]).float().mean().item()
                 results_by_L[L]['normal'].append(normal_acc)
                 results_by_L[L]['no_attn'].append(na_acc)
                 results_by_L[L]['no_ffn'].append(nf_acc)
@@ -258,7 +259,8 @@ def plot_per_position_by_carry():
     seqs = torch.tensor([e['seq'] for e in examples], dtype=torch.long)
     x_input = seqs[:, :-1]
     targets = seqs[:, 1:]
-    out_start = NUM_DIGITS + 1
+    out_start = NUM_DIGITS  # average over o0..o3 only (digit-only metric)
+    out_end = out_start + (NUM_DIGITS + 1)
     out_len = NUM_DIGITS + 1
     pos_names = ['Ones\n(+7)', 'Tens', 'Hundreds', 'Overflow']
 

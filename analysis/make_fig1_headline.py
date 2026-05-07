@@ -30,18 +30,18 @@ from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path("<PATH_TO_REPO>")
 
 
 # (label_top, label_bot, mean, std, color)
-# Means and stds match Tab. random-routing and the original Figure 1 source.
+# Means and stds match Tab. random-routing (digit-only metric, average over o0..o3).
 ROWS = [
-    ("Dense FFN",  "baseline",       9.5, 2.4, "#9AA0A6"),
-    ("GLU",        "matched",       10.1, 3.1, "#9AA0A6"),
-    ("Narrow FFN", "h = 64",        30.5, 6.7, "#5B8FCB"),
-    ("MoE top-2",  "2 of 4 active", 35.2, 6.2, "#5B8FCB"),
-    ("MoE top-1",  "learned",       55.4, 12.6, "#4FA987"),
-    ("MoE top-1",  "random",        59.0, 6.3, "#4FA987"),
+    ("Dense FFN",  "baseline",      11.9, 3.6, "#9AA0A6"),
+    ("GLU",        "matched",        9.7, 2.4, "#9AA0A6"),
+    ("Narrow FFN", "h = 64",        23.7, 5.3, "#5B8FCB"),
+    ("MoE top-2",  "2 of 4 active", 18.7, 6.9, "#5B8FCB"),
+    ("MoE top-1",  "learned",       44.3, 12.5, "#4FA987"),
+    ("MoE top-1",  "random",        49.1, 9.5, "#4FA987"),
 ]
 
 GROUP_BANDS = [
@@ -50,7 +50,7 @@ GROUP_BANDS = [
     (4, 5, "top-1 sparse partitioning", "#E2F0EA"),
 ]
 
-P_VALUE_TEXT = r"$\Delta = +3.6$ pp,  $p = 0.60$"
+P_VALUE_TEXT = r"$\Delta = +4.8$ pp,  $p = 0.56$"
 
 
 def plot(rows, save_paths):

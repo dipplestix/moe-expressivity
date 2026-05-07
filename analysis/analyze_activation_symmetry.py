@@ -17,7 +17,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path("<PATH_TO_REPO>")
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "model"))
 
@@ -85,7 +85,9 @@ def build_add7_data(num_digits=3):
         seq = inp + [EOS_TOKEN] + out + [EOS_TOKEN]
         target = seq[1:] + [PAD_TOKEN]
         xs.append(seq); ys.append(target)
-    return torch.tensor(xs, dtype=torch.long), torch.tensor(ys, dtype=torch.long), len(inp) + 1
+    # out_start = num_digits points at the predicted o0; downstream code averages
+    # the next (num_digits + 1) positions = o0..o3, the four real output digits.
+    return torch.tensor(xs, dtype=torch.long), torch.tensor(ys, dtype=torch.long), len(inp)
 
 
 def build_hist_data(T=32, L=10, n=3000, seed=0):
@@ -127,20 +129,21 @@ def ablate_modadd(m, x, y):
 
 
 def ablate_add7(m, x, y, out_start):
+    out_end = out_start + 4  # average over o0..o3 only (exclude trailing EOS / PAD positions)
     with torch.no_grad():
         logits = m(x)
-    normal = (logits.argmax(-1)[:, out_start:] == y[:, out_start:]).float().mean().item()
+    normal = (logits.argmax(-1)[:, out_start:out_end] == y[:, out_start:out_end]).float().mean().item()
     orig = m.atn.forward
     m.atn.forward = lambda *a, _o=orig, **k: torch.zeros_like(_o(*a, **k))
     with torch.no_grad():
         l = m(x)
-    no_attn = (l.argmax(-1)[:, out_start:] == y[:, out_start:]).float().mean().item()
+    no_attn = (l.argmax(-1)[:, out_start:out_end] == y[:, out_start:out_end]).float().mean().item()
     m.atn.forward = orig
     orig = m.ffn.forward
     m.ffn.forward = lambda *a, _o=orig, **k: torch.zeros_like(_o(*a, **k))
     with torch.no_grad():
         l = m(x)
-    no_ffn = (l.argmax(-1)[:, out_start:] == y[:, out_start:]).float().mean().item()
+    no_ffn = (l.argmax(-1)[:, out_start:out_end] == y[:, out_start:out_end]).float().mean().item()
     m.ffn.forward = orig
     return normal, no_attn, no_ffn
 
