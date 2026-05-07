@@ -44,9 +44,9 @@ from analysis.analyze_activation_symmetry import (
 
 
 def ablate_add7(m, x, y, out_start):
-    """Per-token accuracy on add-7 output digits and EOS, excluding the trailing PAD position
-    (target[-1] is the PAD-prediction, not part of the spec)."""
-    sl = slice(out_start, -1)
+    """Per-token accuracy averaged over the four output digits o0..o3 (digit-only metric).
+    Excludes the trailing EOS / PAD positions which are trivially predicted."""
+    sl = slice(out_start, out_start + 4)
     with torch.no_grad():
         logits = m(x)
     normal = (logits.argmax(-1)[:, sl] == y[:, sl]).float().mean().item()

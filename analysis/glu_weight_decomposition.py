@@ -83,6 +83,44 @@ def fourier_concentration_of_vector(v, p):
     return concentration, dominant_freq
 
 
+def diag_avg_token_space(v_residual, E_p, p):
+    """Project a residual-basis (d_in, d_in) interaction matrix into token
+    space using E_p (p, d_in) and average along (a+b) mod p diagonals.
+
+    M_tok[a, b] = E_p[a] @ V_k @ E_p[b]
+    bar_v(s) = (1/p) sum_a M_tok[a, (s-a) mod p]
+    """
+    M_tok = E_p @ v_residual @ E_p.T  # (p, p), token-space interaction
+    diag_avg = np.zeros(p)
+    for s in range(p):
+        diag_avg[s] = np.mean([M_tok[a, (s - a) % p] for a in range(p)])
+    return diag_avg
+
+
+def get_token_embedding_matrix(model, p):
+    """Return E_p of shape (p, d_in): input residual representations of digits 0..p-1.
+    Uses just the token embedding (no positional component) for the simpler
+    canonical form; per-position variants can be obtained by adding pos_embed."""
+    return model.vocab.weight[:p, :].detach().numpy()
+
+
+def weight_fourier_concentrations(glu_module, E_p, p, k_top=10):
+    """Compute Fourier concentration on (a+b) mod p for top-k right singular
+    vectors of the GLU bilinear tensor, evaluated in token space.
+    Returns (mean_conc_top_k, list_of_concs, list_of_freqs)."""
+    T = get_bilinear_tensor(glu_module)
+    in_dim = glu_module.gate_proj.weight.shape[1]
+    _, S, Vh = analyze_tensor_spectrum(T)
+    concs, freqs = [], []
+    for k in range(min(k_top, len(S))):
+        v_residual = Vh[k].reshape(in_dim, in_dim)
+        diag_avg = diag_avg_token_space(v_residual, E_p, p)
+        conc, freq = fourier_concentration_of_vector(diag_avg, p)
+        concs.append(conc)
+        freqs.append(freq)
+    return float(np.mean(concs)) if concs else 0.0, concs, freqs
+
+
 # ============================================================
 # 1. Modular Addition: Fourier structure in GLU weights
 # ============================================================
@@ -105,37 +143,18 @@ def analyze_modadd():
                 print(f"  s{seed}: not grokked, skipping")
                 continue
 
+            E_p = get_token_embedding_matrix(model, P)
+
             if ftype == 'glu':
-                ffn = model.ffn
-                T = get_bilinear_tensor(ffn)
-                U, S, Vh = analyze_tensor_spectrum(T)
-
-                # Check Fourier concentration of right singular vectors
-                # Vh has shape (min(out,in^2), in_dim^2)
-                # Reshape each row back to (in_dim, in_dim) and check Fourier structure
-                in_dim = ffn.gate_proj.weight.shape[1]
-                weight_concs = []
-                weight_freqs = []
-                for k in range(min(20, len(S))):  # top 20 singular vectors
-                    v = Vh[k].reshape(in_dim, in_dim)
-                    # Project onto (a+b) mod p by averaging over diagonals
-                    diag_avg = np.zeros(P)
-                    for s in range(P):
-                        vals = []
-                        for a in range(min(P, in_dim)):
-                            b = (s - a) % P
-                            if b < in_dim:
-                                vals.append(v[a, b])
-                        if vals:
-                            diag_avg[s] = np.mean(vals)
-                    conc, freq = fourier_concentration_of_vector(diag_avg, P)
-                    weight_concs.append(conc)
-                    weight_freqs.append(freq)
-
-                mean_conc = np.mean(weight_concs[:10])
-                all_weight_concs.append(mean_conc)
-                top_freqs = [weight_freqs[k] for k in range(min(5, len(weight_freqs)))]
-                print(f"  s{seed}: weight Fourier conc (top-10 SVs) = {mean_conc:.4f}, "
+                mean_conc, weight_concs, weight_freqs = \
+                    weight_fourier_concentrations(model.ffn, E_p, P, k_top=20)
+                # Average top-10 for the headline number to match prior protocol
+                mean_conc_top10 = float(np.mean(weight_concs[:10]))
+                all_weight_concs.append(mean_conc_top10)
+                top_freqs = weight_freqs[:5]
+                _, S, _ = analyze_tensor_spectrum(get_bilinear_tensor(model.ffn))
+                print(f"  s{seed}: weight Fourier conc (top-10 SVs, token-space) = "
+                      f"{mean_conc_top10:.4f}, "
                       f"top singular values = {np.round(S[:5], 2)}, "
                       f"top freqs = {top_freqs}")
 
@@ -143,30 +162,14 @@ def analyze_modadd():
                 # MoE-GLU: analyze each expert
                 expert_concs = []
                 for e_idx, expert in enumerate(model.ffn.experts):
-                    T = get_bilinear_tensor(expert)
-                    U, S, Vh = analyze_tensor_spectrum(T)
+                    mean_conc, _, _ = weight_fourier_concentrations(
+                        expert, E_p, P, k_top=10)
+                    expert_concs.append(mean_conc)
 
-                    in_dim = expert.gate_proj.weight.shape[1]
-                    weight_concs = []
-                    for k in range(min(10, len(S))):
-                        v = Vh[k].reshape(in_dim, in_dim)
-                        diag_avg = np.zeros(P)
-                        for s in range(P):
-                            vals = []
-                            for a in range(min(P, in_dim)):
-                                b = (s - a) % P
-                                if b < in_dim:
-                                    vals.append(v[a, b])
-                            if vals:
-                                diag_avg[s] = np.mean(vals)
-                        conc, _ = fourier_concentration_of_vector(diag_avg, P)
-                        weight_concs.append(conc)
-                    expert_concs.append(np.mean(weight_concs))
-
-                mean_conc = np.mean(expert_concs)
+                mean_conc = float(np.mean(expert_concs))
                 all_weight_concs.append(mean_conc)
-                print(f"  s{seed}: per-expert weight Fourier conc = {[f'{c:.4f}' for c in expert_concs]}, "
-                      f"mean = {mean_conc:.4f}")
+                print(f"  s{seed}: per-expert weight Fourier conc (token-space) = "
+                      f"{[f'{c:.4f}' for c in expert_concs]}, mean = {mean_conc:.4f}")
 
         if all_weight_concs:
             wc = np.array(all_weight_concs)
@@ -224,47 +227,18 @@ def plot_comparison():
             if ckpt['test_acc'] < 0.5:
                 continue
 
+            E_p = get_token_embedding_matrix(model, P)
             if ftype == 'glu':
-                T = get_bilinear_tensor(model.ffn)
-                _, S, Vh = analyze_tensor_spectrum(T)
-                in_dim = model.ffn.gate_proj.weight.shape[1]
-                concs = []
-                for k in range(min(10, len(S))):
-                    v = Vh[k].reshape(in_dim, in_dim)
-                    diag_avg = np.zeros(P)
-                    for s in range(P):
-                        vals = []
-                        for a in range(min(P, in_dim)):
-                            b_val = (s - a) % P
-                            if b_val < in_dim:
-                                vals.append(v[a, b_val])
-                        if vals:
-                            diag_avg[s] = np.mean(vals)
-                    conc, _ = fourier_concentration_of_vector(diag_avg, P)
-                    concs.append(conc)
-                weight_concs[ftype].append(np.mean(concs))
+                mean_conc, _, _ = weight_fourier_concentrations(
+                    model.ffn, E_p, P, k_top=10)
+                weight_concs[ftype].append(mean_conc)
             else:
                 expert_concs = []
                 for expert in model.ffn.experts:
-                    T = get_bilinear_tensor(expert)
-                    _, S, Vh = analyze_tensor_spectrum(T)
-                    in_dim = expert.gate_proj.weight.shape[1]
-                    concs = []
-                    for k in range(min(10, len(S))):
-                        v = Vh[k].reshape(in_dim, in_dim)
-                        diag_avg = np.zeros(P)
-                        for s in range(P):
-                            vals = []
-                            for a in range(min(P, in_dim)):
-                                b_val = (s - a) % P
-                                if b_val < in_dim:
-                                    vals.append(v[a, b_val])
-                            if vals:
-                                diag_avg[s] = np.mean(vals)
-                        conc, _ = fourier_concentration_of_vector(diag_avg, P)
-                        concs.append(conc)
-                    expert_concs.append(np.mean(concs))
-                weight_concs[ftype].append(np.mean(expert_concs))
+                    mc, _, _ = weight_fourier_concentrations(
+                        expert, E_p, P, k_top=10)
+                    expert_concs.append(mc)
+                weight_concs[ftype].append(float(np.mean(expert_concs)))
 
     # Activation concentrations (from previous analysis)
     activation_concs = {

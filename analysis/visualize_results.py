@@ -86,23 +86,25 @@ def generate_add7_examples():
 
 
 def ablation_accuracy(model, x, targets, out_start):
-    """Compute normal, no-attn, no-ffn accuracy."""
+    """Compute normal, no-attn, no-ffn accuracy averaged over the four output digits o0..o3."""
+    out_end = out_start + (NUM_DIGITS + 1)
+    sl = slice(out_start, out_end)
     with torch.no_grad():
         logits = model(x)
-    normal = (logits.argmax(-1)[:, out_start:] == targets[:, out_start:]).float().mean().item()
+    normal = (logits.argmax(-1)[:, sl] == targets[:, sl]).float().mean().item()
 
     orig_attn = model.atn.forward
     model.atn.forward = lambda *a, _o=orig_attn, **k: torch.zeros_like(_o(*a, **k))
     with torch.no_grad():
         logits_na = model(x)
-    no_attn = (logits_na.argmax(-1)[:, out_start:] == targets[:, out_start:]).float().mean().item()
+    no_attn = (logits_na.argmax(-1)[:, sl] == targets[:, sl]).float().mean().item()
     model.atn.forward = orig_attn
 
     orig_ffn = model.ffn.forward
     model.ffn.forward = lambda *a, _o=orig_ffn, **k: torch.zeros_like(_o(*a, **k))
     with torch.no_grad():
         logits_nf = model(x)
-    no_ffn = (logits_nf.argmax(-1)[:, out_start:] == targets[:, out_start:]).float().mean().item()
+    no_ffn = (logits_nf.argmax(-1)[:, sl] == targets[:, sl]).float().mean().item()
     model.ffn.forward = orig_ffn
 
     return normal, no_attn, no_ffn
@@ -399,7 +401,7 @@ def fig4_h1_ablation():
     seqs = torch.tensor([e['seq'] for e in examples], dtype=torch.long)
     x_input = seqs[:, :-1]
     targets = seqs[:, 1:]
-    out_start = NUM_DIGITS + 1
+    out_start = NUM_DIGITS  # average no-FFN / no-attn over o0..o3 (the four real output digits)
 
     ftypes = ['ffn', 'glu', 'moe', 'moe_glu']
     results = {f: {'normal': [], 'no_attn': [], 'no_ffn': []} for f in ftypes}
@@ -869,7 +871,7 @@ def figa3_norm_ablation_add7():
     seqs = torch.tensor([e['seq'] for e in examples], dtype=torch.long)
     x_input = seqs[:, :-1]
     targets = seqs[:, 1:]
-    out_start = NUM_DIGITS + 1
+    out_start = NUM_DIGITS  # average no-FFN / no-attn over o0..o3 (the four real output digits)
 
     ftypes = ['ffn', 'glu', 'moe', 'moe_glu']
 

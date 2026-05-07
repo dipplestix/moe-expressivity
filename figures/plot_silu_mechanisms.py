@@ -3,6 +3,8 @@ Figure: SiLU activation robustness check for three main mechanistic findings.
 3-panel figure for NeurIPS full-width (6.75 inches).
 """
 
+import os
+
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -25,10 +27,10 @@ plt.rcParams.update({
 ax = axes[0]
 # no-FFN accuracy (the key metric showing redistribution)
 labels = ['GLU', 'MoE-GLU']
-gelu_means = [20.9, 39.0]
-gelu_errs  = [7.4, 13.2]
-silu_means = [20.3, 37.2]
-silu_errs  = [8.0, 12.2]
+gelu_means = [12.0, 30.7]
+gelu_errs  = [3.4, 5.6]
+silu_means = [13.7, 32.5]
+silu_errs  = [4.0, 6.0]
 
 x = np.arange(len(labels))
 w = 0.32
@@ -41,7 +43,7 @@ ax.set_xticks(x)
 ax.set_xticklabels(labels)
 ax.set_ylabel('No-FFN accuracy (%)')
 ax.set_title('(a) Redistribution (H1)', fontsize=9, fontweight='semibold')
-ax.set_ylim(0, 75)
+ax.set_ylim(0, 50)
 ax.legend(fontsize=6.5, frameon=False, loc='upper left')
 
 # ── Panel (b): H2 Fourier Opacity ──
@@ -113,6 +115,7 @@ for ax in axes:
     ax.tick_params(width=0.6, length=3)
 
 plt.tight_layout(w_pad=1.8)
-fig.savefig('<PATH_TO_REPO>/figures/fig_silu_mechanisms.png', dpi=300, bbox_inches='tight')
-fig.savefig('<PATH_TO_REPO>/figures/fig_silu_mechanisms.pdf', bbox_inches='tight')
+_FIG_DIR = os.path.dirname(os.path.abspath(__file__))
+fig.savefig(os.path.join(_FIG_DIR, 'fig_silu_mechanisms.png'), dpi=300, bbox_inches='tight')
+fig.savefig(os.path.join(_FIG_DIR, 'fig_silu_mechanisms.pdf'), bbox_inches='tight')
 print('Saved PNG and PDF.')
