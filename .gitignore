@@ -17,9 +17,6 @@ __marimo__/
 !requirements*.txt
 
 
-experiments.md
-results_all_experiments.md
-results_generalization.json
 
 # OS junk
 .DS_Store
